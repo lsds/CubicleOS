@@ -1,0 +1,62 @@
+--- a/src/os/unix/ngx_writev_chain.c
++++ b/src/os/unix/ngx_writev_chain.c
+@@ -194,7 +194,10 @@
+	    app_ipc_add_heap(tmp->iov_base, tmp->iov_len, (1 << 0 ) | (1 << 17) | (1 << 21) );
+    }
+ 
++
++    app_ipc_add_stack(19,vec->iovs, sizeof(struct iovec)*vec->count, (1 << 0 ) | (1 << 17) | (1 << 21) );
+     n = writev(c->fd, vec->iovs, vec->count);
++    app_ipc_add_stack(19, 0, 0, 0);
+ 
+    for(int i = 0; i < vec->count; i++) {
+	struct iovec *tmp = (struct iovec *) &(vec->iovs[i]);
+--- a/src/os/unix/ngx_alloc.c
++++ b/src/os/unix/ngx_alloc.c
+@@ -20,10 +20,10 @@
+ {
+     void  *p;
+ 
+-#if 1
+-    p = malloc(size);
+-#else
++#if DL_ALLOC
+     p = dl_nginx_malloc(size);
++#else
++    p = malloc(size);
+ #endif
+     if (p == NULL) {
+         ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+@@ -40,10 +40,10 @@
+ ngx_calloc(size_t size, ngx_log_t *log)
+ {
+     void  *p;
+-#if 1
+-    p = ngx_alloc(size, log);
++#if DL_ALLOC
++    p = dl_nginx_calloc(1, size);
+ #else
+-    p = dl_nginx_calloc(size);
++    p = ngx_alloc(size, log);
+ #endif
+     if (p) {
+         ngx_memzero(p, size);
+
+--- a/src/os/unix/ngx_alloc.h
++++ b/src/os/unix/ngx_alloc.h
+@@ -16,7 +16,14 @@
+ void *ngx_alloc(size_t size, ngx_log_t *log);
+ void *ngx_calloc(size_t size, ngx_log_t *log);
+ 
++//#define DL_ALLOC
++//dlalloc doesn't work
++
++#if DL_ALLOC
++#define ngx_free          dl_nginx_free
++#else
+ #define ngx_free          free
++#endif
+ 
+ 
+ /*
+

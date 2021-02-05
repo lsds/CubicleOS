@@ -1,0 +1,56 @@
+--- /dev/null	2020-03-20 13:22:49.412000000 +0300
++++ sqlite-amalgamation-3300100/dlmemreq.c	2020-06-30 14:24:23.812000000 +0300
+@@ -0,0 +1,53 @@
++#include "dlmemreq.h"
++
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <stdlib.h>
++#include <sys/param.h>
++
++#include <vfscore/dentry.h>
++#include <vfscore/vnode.h>
++
++#include <uk/essentials.h>
++
++
++//#define DEBUG
++
++void abort2(void) {
++	printf("abort has been called\n");while(1);
++}
++
++void *__expand_heap(size_t *pn)
++{
++    printf("expand_heap is not supported\n");
++    while(1);
++}
++
++static void *u_ch_start = NULL;
++static long u_ch_ctr = 0;
++static long u_ch_size = (CONFIG_LINUXU_DEFAULT_HEAPMB*1024LL*1024/4);
++
++char* u_get_memory(unsigned num_bytes) {
++#ifdef DEBUG
++    printf("get_mem: %p/%x/%x/%lx\n", u_ch_start, u_ch_ctr, u_ch_size, num_bytes);
++#endif
++	if(u_ch_start == NULL) {
++//		printf("allocating %x bytes for VFScoRE\n", u_ch_size);
++		u_ch_start = malloc(u_ch_size);
++		if(u_ch_start == NULL) {
++			printf("cannot allocate memory for SQLITE \n");while(1);
++		}
++		u_ch_ctr = 0;
++	}
++
++	if(u_ch_ctr + num_bytes > u_ch_size) {
++		printf("OOM, die\n");
++		while(1);
++	}
++
++	char *ret = (char *) (u_ch_start + u_ch_ctr);
++	u_ch_ctr += num_bytes;
++
++	return ret;
++}

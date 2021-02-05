@@ -1,0 +1,12 @@
+--- /dev/null	2020-07-07 11:38:57.748000000 +0300
++++ sqlite-amalgamation-3300100/ipc.h	2020-07-14 23:22:07.724000000 +0300
+@@ -0,0 +1,8 @@
++#ifndef IPC_H
++#define IPC_H
++
++void app_ipc_add_heap(void *, int, int);
++void app_ipc_remove_heap(void *);
++void app_ipc_add_stack(int i, char *begin, int size, int mask);
++
++#endif
+\ No newline at end of file

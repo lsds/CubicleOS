@@ -1,0 +1,11 @@
+menuconfig LIBSQLITE
+    bool "SQLite"
+    default y
+    select LIBPOSIX_SYSINFO
+    select LIBNEWLIBC
+
+if LIBSQLITE
+config LIBSQLITE_MAIN_FUNCTION
+    bool "Provide main function"
+    default y
+endif

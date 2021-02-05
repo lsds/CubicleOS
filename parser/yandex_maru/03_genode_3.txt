@@ -1,0 +1,31 @@
+[init -> sqlite]  100 - 50000 INSERTs into table with no index...................... 	   0.090
+[init -> sqlite]  110 - 50000 ordered INSERTS with one index/PK..................... 	   0.116
+[init -> sqlite]  120 - 50000 unordered INSERTS with one index/PK................... 	   0.158
+[init -> sqlite]  130 - 25 SELECTS, numeric BETWEEN, unindexed...................... 	   0.184
+[init -> sqlite]  140 - 10 SELECTS, LIKE, unindexed................................. 	   0.272
+[init -> sqlite]  142 - 10 SELECTS w/ORDER BY, unindexed............................ 	   0.404
+[init -> sqlite]  145 - 10 SELECTS w/ORDER BY and LIMIT, unindexed.................. 	   0.183
+[init -> sqlite]  150 - CREATE INDEX five times..................................... 	   0.344
+[init -> sqlite]  160 - 10000 SELECTS, numeric BETWEEN, indexed..................... 	   0.140
+[init -> sqlite]  161 - 10000 SELECTS, numeric BETWEEN, PK.......................... 	   0.143
+[init -> sqlite]  170 - 10000 SELECTS, text BETWEEN, indexed........................ 	   0.638
+[init -> sqlite]  180 - 50000 INSERTS with three indexes............................ 	   0.378
+[init -> sqlite]  190 - DELETE and REFILL one table................................. 	   0.382
+[init -> sqlite]  210 - ALTER TABLE ADD COLUMN, and query........................... 	   0.011
+[init -> sqlite]  230 - 10000 UPDATES, numeric BETWEEN, indexed..................... 	   0.190
+[init -> sqlite]  240 - 50000 UPDATES of individual rows............................ 	   0.536
+[init -> sqlite]  250 - One big UPDATE of the whole 50000-row table................. 	   0.037
+[init -> sqlite]  260 - Query added column after filling............................ 	   0.010
+[init -> sqlite]  270 - 10000 DELETEs, numeric BETWEEN, indexed..................... 	   1.007
+[init -> sqlite]  280 - 50000 DELETEs of individual rows............................ 	   0.515
+[init -> sqlite]  290 - Refill two 50000-row tables using REPLACE................... 	   0.764
+[init -> sqlite]  300 - Refill a 50000-row table using (b&1)==(a&1)................. 	   0.288
+[init -> sqlite]  310 - 10000 four-ways joins....................................... 	   1.712
+[init -> sqlite]  320 - subquery in result set...................................... 	   0.414
+[init -> sqlite]  400 - 70000 REPLACE ops on an IPK................................. 	   0.191
+[init -> sqlite]  410 - 70000 SELECTS on an IPK..................................... 	   1.032
+[init -> sqlite]  500 - 70000 REPLACE on TEXT PK.................................... 	   0.210
+[init -> sqlite]  510 - 70000 SELECTS on a TEXT PK.................................. 	   1.125
+[init -> sqlite]  520 - 70000 SELECT DISTINCT....................................... 	   0.142
+[init -> sqlite]  980 - PRAGMA integrity_check...................................... 	   0.842
+[init -> sqlite]  990 - ANALYZE..................................................... 	   0.084

@@ -1,0 +1,31 @@
+ 100 - 50000 INSERTs into table with no index......................    0.094s
+ 110 - 50000 ordered INSERTS with one index/PK.....................    0.098s
+ 120 - 50000 unordered INSERTS with one index/PK...................    0.134s
+ 130 - 25 SELECTS, numeric BETWEEN, unindexed......................    0.132s
+ 140 - 10 SELECTS, LIKE, unindexed.................................    0.325s
+ 142 - 10 SELECTS w/ORDER BY, unindexed............................    0.428s
+ 145 - 10 SELECTS w/ORDER BY and LIMIT, unindexed..................    0.130s
+ 150 - CREATE INDEX five times.....................................    0.524s
+ 160 - 10000 SELECTS, numeric BETWEEN, indexed.....................    0.139s
+ 161 - 10000 SELECTS, numeric BETWEEN, PK..........................    0.113s
+ 170 - 10000 SELECTS, text BETWEEN, indexed........................    0.464s
+ 180 - 50000 INSERTS with three indexes............................    0.351s
+ 190 - DELETE and REFILL one table.................................    0.369s
+ 210 - ALTER TABLE ADD COLUMN, and query...........................    0.007s
+ 230 - 10000 UPDATES, numeric BETWEEN, indexed.....................    0.198s
+ 240 - 50000 UPDATES of individual rows............................    0.400s
+ 250 - One big UPDATE of the whole 50000-row table.................    0.022s
+ 260 - Query added column after filling............................    0.007s
+ 270 - 10000 DELETEs, numeric BETWEEN, indexed.....................    0.811s
+ 280 - 50000 DELETEs of individual rows............................    0.444s
+ 290 - Refill two 50000-row tables using REPLACE...................    0.771s
+ 300 - Refill a 50000-row table using (b&1)==(a&1).................    0.321s
+ 310 - 10000 four-ways joins.......................................    2.940s
+ 320 - subquery in result set......................................    0.290s
+ 400 - 70000 REPLACE ops on an IPK.................................    0.127s
+ 410 - 70000 SELECTS on an IPK.....................................    0.809s
+ 500 - 70000 REPLACE on TEXT PK....................................    0.135s
+ 510 - 70000 SELECTS on a TEXT PK..................................    0.859s
+ 520 - 70000 SELECT DISTINCT.......................................    0.116s
+ 980 - PRAGMA integrity_check......................................    0.901s
+ 990 - ANALYZE.....................................................    0.177s

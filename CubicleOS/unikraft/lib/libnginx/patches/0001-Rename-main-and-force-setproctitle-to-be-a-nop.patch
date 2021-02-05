@@ -1,0 +1,25 @@
+From f6c9df931cd57fd9670a3ed8218d0fb5e262a03e Mon Sep 17 00:00:00 2001
+From: Mihai Pogonaru <pogonarumihai@gmail.com>
+Date: Sat, 1 Jun 2019 02:03:51 +0300
+Subject: [PATCH] Rename main and force setproctitle to be a nop
+
+---
+ src/os/unix/ngx_setproctitle.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/os/unix/ngx_setproctitle.h b/src/os/unix/ngx_setproctitle.h
+index c363662..0f9acbe 100644
+--- a/src/os/unix/ngx_setproctitle.h
++++ b/src/os/unix/ngx_setproctitle.h
+@@ -29,7 +29,7 @@
+ ngx_int_t ngx_init_setproctitle(ngx_log_t *log);
+ void ngx_setproctitle(char *title);
+ 
+-#elif (NGX_LINUX) || (NGX_DARWIN)
++#elif 0 //(NGX_LINUX) || (NGX_DARWIN)
+ 
+ #define NGX_SETPROCTITLE_USES_ENV  1
+ #define NGX_SETPROCTITLE_PAD       '\0'
+-- 
+2.11.0
+

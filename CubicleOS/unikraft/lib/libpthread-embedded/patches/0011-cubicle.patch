@@ -1,0 +1,14 @@
+--- a/pthread_key_create.c
++++ b/pthread_key_create.c8
+@@ -89,6 +89,11 @@
+     }
+   else
+     {
++//
++	extern void ukboot_ipc_add_heap(void *, size_t, int);
++	ukboot_ipc_add_heap(newkey, sizeof(*newkey), (1 << 0 ) | (1 << 25));
++//
++
+       pte_osResult osResult = pte_osTlsAlloc(&(newkey->key));
+ 
+       if (osResult != PTE_OS_OK)

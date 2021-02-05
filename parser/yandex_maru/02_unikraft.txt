@@ -1,0 +1,31 @@
+ 100 - 50000 INSERTs into table with no index...................... 	   0.193
+ 110 - 50000 ordered INSERTS with one index/PK..................... 	   0.656
+ 120 - 50000 unordered INSERTS with one index/PK................... 	   1.346
+ 130 - 25 SELECTS, numeric BETWEEN, unindexed...................... 	   0.079
+ 140 - 10 SELECTS, LIKE, unindexed................................. 	   0.155
+ 142 - 10 SELECTS w/ORDER BY, unindexed............................ 	   0.221
+ 145 - 10 SELECTS w/ORDER BY and LIMIT, unindexed.................. 	   0.121
+ 150 - CREATE INDEX five times..................................... 	   7.793
+ 160 - 10000 SELECTS, numeric BETWEEN, indexed..................... 	   0.075
+ 161 - 10000 SELECTS, numeric BETWEEN, PK.......................... 	   0.074
+ 170 - 10000 SELECTS, text BETWEEN, indexed........................ 	   0.228
+ 180 - 50000 INSERTS with three indexes............................ 	   4.458
+ 190 - DELETE and REFILL one table................................. 	   0.556
+ 210 - ALTER TABLE ADD COLUMN, and query........................... 	   0.006
+ 230 - 10000 UPDATES, numeric BETWEEN, indexed..................... 	   1.026
+ 240 - 50000 UPDATES of individual rows............................ 	   0.439
+ 250 - One big UPDATE of the whole 50000-row table................. 	   0.244
+ 260 - Query added column after filling............................ 	   0.006
+ 270 - 10000 DELETEs, numeric BETWEEN, indexed..................... 	   1.570
+ 280 - 50000 DELETEs of individual rows............................ 	   0.914
+ 290 - Refill two 50000-row tables using REPLACE................... 	   1.188
+ 300 - Refill a 50000-row table using (b&1)==(a&1)................. 	   0.266
+ 310 - 10000 four-ways joins....................................... 	   0.593
+ 320 - subquery in result set...................................... 	   0.355
+ 400 - 70000 REPLACE ops on an IPK................................. 	   0.189
+ 410 - 70000 SELECTS on an IPK..................................... 	   0.535
+ 500 - 70000 REPLACE on TEXT PK.................................... 	   3.180
+ 510 - 70000 SELECTS on a TEXT PK.................................. 	   0.592
+ 520 - 70000 SELECT DISTINCT....................................... 	   0.089
+ 980 - PRAGMA integrity_check...................................... 	   0.427
+ 990 - ANALYZE..................................................... 	   0.054

@@ -1,0 +1,216 @@
+#  SPDX-License-Identifier: BSD-3-Clause
+#
+#  Nginx Makefile.uk
+#
+#  Authors: Mihai Pogonaru <pogonarumihai@gmail.com>
+#
+#  Copyright (c) 2019, University Politehnica of Bucharest. All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its
+#     contributors may be used to endorse or promote products derived from
+#     this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+#  THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
+#
+
+################################################################################
+# Library registration
+################################################################################
+$(eval $(call addlib_s,libnginx,$(CONFIG_LIBNGINX)))
+
+################################################################################
+# Sources
+################################################################################
+LIBNGINX_VERSION = 1.15.6
+LIBNGINX_BASENAME = nginx-$(LIBNGINX_VERSION)
+LIBNGINX_URL = http://nginx.org/download/$(LIBNGINX_BASENAME).tar.gz
+LIBNGINX_PATCHDIR = $(LIBNGINX_BASE)/patches
+$(eval $(call fetch,libnginx,$(LIBNGINX_URL)))
+$(eval $(call patch,libnginx,$(LIBNGINX_PATCHDIR),nginx-$(LIBNGINX_VERSION)))
+
+################################################################################
+# Helpers
+################################################################################
+LIBNGINX_SRC = $(LIBNGINX_ORIGIN)/$(LIBNGINX_BASENAME)/src
+
+################################################################################
+# Sources
+################################################################################
+LIBNGINX_SRCS-$(CONFIG_LIBNGINX_MAIN_FUNCTION) += $(LIBNGINX_BASE)/main.c|unikraft
+LIBNGINX_SRCS-$(CONFIG_LIBNGINX_MAIN_FUNCTION) += $(LIBNGINX_BASE)/cpio.c|unikraft
+LIBNGINX_SRCS-$(CONFIG_LIBNGINX_MAIN_FUNCTION) += $(LIBNGINX_BASE)/ipc.c|unikraft
+LIBNGINX_SRCS-$(CONFIG_LIBNGINX_MAIN_FUNCTION) += $(LIBNGINX_BASE)/dlmemreq.c|unikraft
+LIBNGINX_SRCS-$(CONFIG_LIBNGINX_MAIN_FUNCTION) += $(LIBNGINX_BASE)/dlmalloc.c|unikraft
+################################################################################
+# Library includes
+################################################################################
+CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_BASE)/include
+
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/core
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/event
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/event/modules
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/http
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/http/modules
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/http/modules/perl
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/http/v2
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/mail
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/os/unix
+LIBNGINX_CINCLUDES-$(CONFIG_LIBNGINX) += -I$(LIBNGINX_SRC)/stream
+
+################################################################################
+# Flags
+################################################################################
+LIBNGINX_FLAGS = -Wpointer-arith
+
+# Suppress some warnings to make the build process look neater
+LIBNGINX_FLAGS_SUPPRESS = -Wno-unused-parameter -Wno-unused-variable	\
+-Wno-unused-but-set-variable -Wno-unused-value
+
+LIBNGINX_CFLAGS-y +=  $(LIBNGINX_FLAGS)
+LIBNGINX_CFLAGS-y +=  $(LIBNGINX_FLAGS_SUPPRESS)
+
+# Rename the main function found in core/main.c to nginx_main
+LIBNGINX_NGINX_FLAGS-y += -Dmain=nginx_main
+
+################################################################################
+# Library sources
+################################################################################
+LIBNGINX_SRCS-y += $(LIBNGINX_BASE)/ngx_modules.c
+
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/nginx.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_array.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_buf.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_conf_file.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_connection.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_cpuinfo.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_crc32.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_crypt.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_cycle.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_file.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_hash.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_inet.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_list.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_log.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_md5.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_murmurhash.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_open_file_cache.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_output_chain.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_palloc.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_parse.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_parse_time.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_proxy_protocol.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_queue.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_radix_tree.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_rbtree.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_resolver.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_rwlock.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_sha1.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_shmtx.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_slab.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_spinlock.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_string.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_syslog.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/core/ngx_times.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/event/modules/ngx_select_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/event/ngx_event_accept.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/event/ngx_event.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/event/ngx_event_connect.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/event/ngx_event_pipe.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/event/ngx_event_posted.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/event/ngx_event_timer.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/event/ngx_event_udp.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_copy_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_core_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_header_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_parse.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_postpone_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_request_body.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_request.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_script.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_special_response.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_upstream.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_upstream_round_robin.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_variables.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/ngx_http_write_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_alloc.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_channel.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_daemon.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_dlopen.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_errno.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_files.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_linux_init.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_linux_sendfile_chain.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_posix_init.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_process.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_process_cycle.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_readv_chain.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_recv.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_send.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_setaffinity.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_setproctitle.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_shmem.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_socket.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_time.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_udp_recv.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_udp_send.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_udp_sendmsg_chain.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_user.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/os/unix/ngx_writev_chain.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_access_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_autoindex_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_browser_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_charset_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_chunked_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_empty_gif_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_fastcgi_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_geo_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_headers_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_index_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_limit_conn_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_limit_req_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_log_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_map_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_memcached_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_mirror_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_not_modified_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_proxy_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_range_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_referer_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_scgi_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_split_clients_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_ssi_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_static_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_sub_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_try_files_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_upstream_hash_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_upstream_ip_hash_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_upstream_keepalive_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_upstream_least_conn_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_upstream_random_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_upstream_zone_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_userid_filter_module.c
+LIBNGINX_SRCS-y += $(LIBNGINX_SRC)/http/modules/ngx_http_uwsgi_module.c
+

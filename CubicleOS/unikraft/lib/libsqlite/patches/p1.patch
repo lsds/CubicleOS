@@ -1,0 +1,27 @@
+--- sqlite-amalgamation-3300100/sqlite3.c	2020-06-08 06:52:59.527171189 +0000
++++ sqlite-amalgamation-3300100/sqlite3.c	2020-06-08 08:01:42.807151263 +0000
+@@ -1,4 +1,10 @@
+-/******************************************************************************
++void *dl2malloc(int size);
++void *dl2calloc(int nmemb, int size);
++void dl2free(void *ptr);
++void *dl2realloc(void *ptr, int size);
++
++/****************
++**************************************************************
+ ** This file is an amalgamation of many separate C source files from SQLite
+ ** version 3.30.1.  By combining all the individual C code files into this
+ ** single large file, the entire code can be compiled as a single translation
+@@ -22988,9 +22994,9 @@
+ ** Use standard C library malloc and free on non-Apple systems.  
+ ** Also used by Apple systems if SQLITE_WITHOUT_ZONEMALLOC is defined.
+ */
+-#define SQLITE_MALLOC(x)             malloc(x)
+-#define SQLITE_FREE(x)               free(x)
+-#define SQLITE_REALLOC(x,y)          realloc((x),(y))
++#define SQLITE_MALLOC(x)             dl2malloc(x)
++#define SQLITE_FREE(x)               dl2free(x)
++#define SQLITE_REALLOC(x,y)          dl2realloc((x),(y))
+ 
+ /*
+ ** The malloc.h header file is needed for malloc_usable_size() function

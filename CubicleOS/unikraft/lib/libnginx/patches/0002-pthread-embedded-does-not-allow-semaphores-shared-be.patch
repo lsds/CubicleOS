@@ -1,0 +1,27 @@
+From 30557083a93221ea1e5817c60bad16d4bd13a16c Mon Sep 17 00:00:00 2001
+From: Mihai Pogonaru <pogonarumihai@gmail.com>
+Date: Fri, 14 Jun 2019 01:31:43 +0300
+Subject: [PATCH] pthread-embedded does not allow semaphores shared between
+ processes
+
+Signed-off-by: Mihai Pogonaru <pogonarumihai@gmail.com>
+---
+ src/core/ngx_shmtx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/core/ngx_shmtx.c b/src/core/ngx_shmtx.c
+index a255903..6da5cab 100644
+--- a/src/core/ngx_shmtx.c
++++ b/src/core/ngx_shmtx.c
+@@ -30,7 +30,7 @@ ngx_shmtx_create(ngx_shmtx_t *mtx, ngx_shmtx_sh_t *addr, u_char *name)
+ 
+     mtx->wait = &addr->wait;
+ 
+-    if (sem_init(&mtx->sem, 1, 0) == -1) {
++    if (sem_init(&mtx->sem, 0, 0) == -1) {
+         ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, ngx_errno,
+                       "sem_init() failed");
+     } else {
+-- 
+2.11.0
+

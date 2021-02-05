@@ -1,0 +1,513 @@
+diff -uarN sqlite-amalgamation-3300100_old/ipc.c sqlite-amalgamation-3300100/ipc.c
+--- sqlite-amalgamation-3300100_old/ipc.c	2020-07-15 14:41:53.636000000 +0300
++++ sqlite-amalgamation-3300100/ipc.c	2020-07-15 18:52:36.384000000 +0300
+@@ -14,9 +14,39 @@
+ //dev/random
+ 	{0, 4096, (1 << 21) | ( 1 << 0)},
+ //tmp stat
+-	{0, 4096, (1 << 21) | ( 1 << 0)},
++	{1, 4096, (1 << 21) | ( 1 << 0)},
+ //speed test version
+-	{0, 1024, (1 << 21) | ( 1 << 0)},
++	{2, 1024, (1 << 21) | ( 1 << 0)},
++//libc fstat
++	{3, 0, (1 << 21) | ( 1 << 0)},
++//libc console fstat
++	{4, 0, (1 << 21) | ( 1 << 0)},
++//findinodeinfo
++	{5, 0, (1 << 21) | ( 1 << 0)},
++//static void verifyDbFile(unixFile *pFile){
++	{6, 0, (1 << 21) | ( 1 << 0)},
++//static int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow){
++	{7, 0, (1 << 16) | ( 1 << 0)},
++//static int unixFileSize(sqlite3_file *id, i64 *pSize){
++	{8, 0, (1 << 21) | ( 1 << 0)},
++//static int getFileMode(
++	{9, 0, (1 << 21) | ( 1 << 0)},
++//static int robust_open(const char *z, int f, mode_t m){
++	{10, 0, (1 << 21) | ( 1 << 0)},
++//static int syncJournal(Pager *pPager, int newHdr){
++	{11, 0, (1 << 21) | ( 1 << 0)},
++//static int openDirectory(const char *zFilename, int *pFd){
++	{12, 0, (1 << 21) | ( 1 << 0)},
++//sqlite3PagerSharedLock
++	{13, 0, (1 << 21) | ( 1 << 0)},
++//static int fileHasMoved(unixFile *pFile){
++	{14, 0, (1 << 21) | ( 1 << 0)},
++//static int write32bits(sqlite3_file *fd, i64 offset, u32 val){
++	{15, 0, (1 << 21) | ( 1 << 0)},
++//ztmpname unixOpen
++	{16, 0, (1 << 21) | ( 1 << 0)},
++//
++	{17, 0, (1 << 21) | ( 1 << 0)},
+ };
+ int APP_ipc_tab_stack_nr = sizeof(APP_ipc_tab_stack)/sizeof(struct ipc_struct);
+ 
+@@ -73,6 +103,7 @@
+ }
+ 
+ void app_ipc_add_stack(int i, void *begin, size_t size, int mask) {
++//		uk_pr_crit("Stack Add [%d] %p %x %x \n", i, begin, size, mask);
+ 		APP_ipc_tab_stack[i].begin = begin;
+ 		APP_ipc_tab_stack[i].size = size;
+ 		APP_ipc_tab_stack[i].mask = mask;
+diff -uarN sqlite-amalgamation-3300100_old/sqlite3.c sqlite-amalgamation-3300100/sqlite3.c
+--- sqlite-amalgamation-3300100_old/sqlite3.c	2020-07-15 15:11:45.140000000 +0300
++++ sqlite-amalgamation-3300100/sqlite3.c	2020-07-15 18:46:22.164000000 +0300
+@@ -33543,10 +33543,21 @@
+   }
+   if( fd>=0 ){
+     if( m!=0 ){
++#ifdef LLVM
+       struct stat statbuf;
+       if( osFstat(fd, &statbuf)==0 
+        && statbuf.st_size==0
+        && (statbuf.st_mode&0777)!=m 
++#else
++	struct pad_s {
++		struct stat statbuf;
++		char empty[4096 - sizeof(struct stat)];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(10, &pad.statbuf, sizeof(struct stat), (1 << 21) | ( 1 << 0));
++      if( osFstat(fd, &pad.statbuf)==0 
++       && pad.statbuf.st_size==0
++       && (pad.statbuf.st_mode&0777)!=m 
++#endif
+       ){
+         osFchmod(fd, m);
+       }
+@@ -34214,7 +34225,16 @@
+   int rc;                        /* System call return code */
+   int fd;                        /* The file descriptor for pFile */
+   struct unixFileId fileId;      /* Lookup key for the unixInodeInfo */
++#ifdef LLVM
+   struct stat statbuf;           /* Low-level file information */
++#else
++	struct pad_s {
++		char tmp[32];
++		struct stat statbuf;
++		char empty[4096 - sizeof(struct stat) - 32];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(5, &pad.statbuf, sizeof(struct stat), (1 << 21) | ( 1 << 0));
++#endif
+   unixInodeInfo *pInode = 0;     /* Candidate unixInodeInfo object */
+ 
+   assert( unixMutexHeld() );
+@@ -34223,7 +34243,11 @@
+   ** create a unique name for the file.
+   */
+   fd = pFile->h;
++#ifdef LLVM
+   rc = osFstat(fd, &statbuf);
++#else
++  rc = osFstat(fd, &pad.statbuf);
++#endif
+   if( rc!=0 ){
+     storeLastErrno(pFile, errno);
+ #if defined(EOVERFLOW) && defined(SQLITE_DISABLE_LFS)
+@@ -34258,11 +34282,19 @@
+ #endif
+ 
+   memset(&fileId, 0, sizeof(fileId));
++#ifdef LLVM
+   fileId.dev = statbuf.st_dev;
++#else
++  fileId.dev = pad.statbuf.st_dev;
++#endif
+ #if OS_VXWORKS
+   fileId.pId = pFile->pId;
+ #else
++#ifdef LLVM
+   fileId.ino = (u64)statbuf.st_ino;
++#else
++  fileId.ino = (u64)pad.statbuf.st_ino;
++#endif
+ #endif
+   assert( unixMutexHeld() );
+   pInode = inodeList;
+@@ -34303,10 +34335,21 @@
+ #if OS_VXWORKS
+   return pFile->pInode!=0 && pFile->pId!=pFile->pInode->fileId.pId;
+ #else
++#ifdef LLVM
+   struct stat buf;
+   return pFile->pInode!=0 &&
+       (osStat(pFile->zPath, &buf)!=0 
+          || (u64)buf.st_ino!=pFile->pInode->fileId.ino);
++#else
++	struct pad_s {
++		struct stat buf;
++		char empty[4096 - sizeof(struct stat)];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(14, &pad.buf, sizeof(struct stat), (1 << 21) | ( 1 << 0));
++  return pFile->pInode!=0 &&
++      (osStat(pFile->zPath, &pad.buf)!=0 
++         || (u64)pad.buf.st_ino!=pFile->pInode->fileId.ino);
++#endif
+ #endif
+ }
+ 
+@@ -34321,22 +34364,43 @@
+ ** Issue sqlite3_log(SQLITE_WARNING,...) messages if anything is not right.
+ */
+ static void verifyDbFile(unixFile *pFile){
++#ifdef LLVM
+   struct stat buf;
++#else
++	struct pad_s {
++		char tmp[64];
++		struct stat buf;
++		char empty[4096 - sizeof(struct stat) - 64];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(6, &pad.buf, sizeof(struct stat), (1 << 21) | ( 1 << 0));
++#endif
+   int rc;
+ 
+   /* These verifications occurs for the main database only */
+   if( pFile->ctrlFlags & UNIXFILE_NOLOCK ) return;
+ 
++#ifdef LLVM
+   rc = osFstat(pFile->h, &buf);
++#else
++  rc = osFstat(pFile->h, &pad.buf);
++#endif
+   if( rc!=0 ){
+     sqlite3_log(SQLITE_WARNING, "cannot fstat db file %s", pFile->zPath);
+     return;
+   }
++#ifdef LLVM
+   if( buf.st_nlink==0 ){
++#else
++  if( pad.buf.st_nlink==0 ){
++#endif
+     sqlite3_log(SQLITE_WARNING, "file unlinked while open: %s", pFile->zPath);
+     return;
+   }
++#ifdef LLVM
+   if( buf.st_nlink>1 ){
++#else
++  if( pad.buf.st_nlink>1 ){
++#endif
+     sqlite3_log(SQLITE_WARNING, "multiple links to file: %s", pFile->zPath);
+     return;
+   }
+@@ -36525,23 +36589,59 @@
+ static int openDirectory(const char *zFilename, int *pFd){
+   int ii;
+   int fd = -1;
++
++#ifdef LLVM
+   char zDirname[MAX_PATHNAME+1];
++#else
++	struct pad_s {
++		char zDirname[4096];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(12, &pad.zDirname, 4096, (1 << 21) | ( 1 << 0));
++#endif
+ 
++#ifdef LLVM
+   sqlite3_snprintf(MAX_PATHNAME, zDirname, "%s", zFilename);
+   for(ii=(int)strlen(zDirname); ii>0 && zDirname[ii]!='/'; ii--);
++#else
++  sqlite3_snprintf(MAX_PATHNAME, pad.zDirname, "%s", zFilename);
++  for(ii=(int)strlen(pad.zDirname); ii>0 && pad.zDirname[ii]!='/'; ii--);
++#endif
++
+   if( ii>0 ){
++#ifdef LLVM
+     zDirname[ii] = '\0';
++#else
++    pad.zDirname[ii] = '\0';
++#endif
+   }else{
++#ifdef LLVM
+     if( zDirname[0]!='/' ) zDirname[0] = '.';
+     zDirname[1] = 0;
++#else
++    if( pad.zDirname[0]!='/' ) pad.zDirname[0] = '.';
++    pad.zDirname[1] = 0;
++#endif
+   }
++#ifdef LLVM
+   fd = robust_open(zDirname, O_RDONLY|O_BINARY, 0);
++#else
++  fd = robust_open(pad.zDirname, O_RDONLY|O_BINARY, 0);
++#endif
++
+   if( fd>=0 ){
++#ifdef LLVM
+     OSTRACE(("OPENDIR %-3d %s\n", fd, zDirname));
++#else
++    OSTRACE(("OPENDIR %-3d %s\n", fd, pad.zDirname));
++#endif
+   }
+   *pFd = fd;
+   if( fd>=0 ) return SQLITE_OK;
++#ifdef LLVM
+   return unixLogError(SQLITE_CANTOPEN_BKPT, "openDirectory", zDirname);
++#else
++  return unixLogError(SQLITE_CANTOPEN_BKPT, "openDirectory", pad.zDirname);
++#endif
+ }
+ 
+ /*
+@@ -36661,16 +36761,32 @@
+ */
+ static int unixFileSize(sqlite3_file *id, i64 *pSize){
+   int rc;
++#ifdef LLVM
+   struct stat buf;
++#else
++	struct pad_s {
++		char tmp[96];
++		struct stat buf;
++		char empty[4096 - sizeof(struct stat) - 96];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(8, &pad.buf, sizeof(struct stat), (1 << 21) | ( 1 << 0));
++#endif
+   assert( id );
++#ifdef LLVM
+   rc = osFstat(((unixFile*)id)->h, &buf);
++#else
++  rc = osFstat(((unixFile*)id)->h, &pad.buf);
++#endif
+   SimulateIOError( rc=1 );
+   if( rc!=0 ){
+     storeLastErrno((unixFile*)id, errno);
+     return SQLITE_IOERR_FSTAT;
+   }
++#ifdef LLVM
+   *pSize = buf.st_size;
+-
++#else
++  *pSize = pad.buf.st_size;
++#endif
+   /* When opening a zero-size database, the findInodeInfo() procedure
+   ** writes a single byte into that file in order to work around a bug
+   ** in the OS-X msdos filesystem.  In order to avoid problems with upper
+@@ -38530,13 +38646,18 @@
+   };
+ 
+ //femto
++#ifdef LLVM
++  struct stat buf;
++#else
+ 	struct pad_s {
+-		char path[4096];
++		struct stat buf;
++		char path[4096-sizeof(struct stat)];
+ 	} __attribute__ ((aligned (4096))) pad;
+ 	app_ipc_add_stack(1, &pad.path, 4096, (1 << 21) | ( 1 << 0));
++#endif
+ 
+   unsigned int i = 0;
+-  struct stat buf;
++
+   const char *zDir = sqlite3_temp_directory;
+ 
+   if( !azDirs[0] ) azDirs[0] = getenv("SQLITE_TMPDIR");
+@@ -38548,10 +38669,12 @@
+     if( zDir!=0
+ #ifdef LLVM
+      && osStat(zDir, &buf)==0
++     && S_ISDIR(buf.st_mode)
+ #else
+-     && osStat(pad.path, &buf)==0
++     && osStat(pad.path, &pad.buf)==0
++     && S_ISDIR(pad.buf.st_mode)
+ #endif
+-     && S_ISDIR(buf.st_mode)
++
+ #ifdef LLVM
+      && osAccess(zDir, 03)==0
+ #else
+@@ -38677,12 +38800,27 @@
+   uid_t *pUid,                    /* OUT: uid of zFile. */
+   gid_t *pGid                     /* OUT: gid of zFile. */
+ ){
++#ifdef LLVM
+   struct stat sStat;              /* Output of stat() on database file */
++#else
++	struct pad_s {
++		struct stat sStat;
++		char empty[4096 - sizeof(struct stat) - 32];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(9, &pad.sStat, sizeof(struct stat), (1 << 21) | ( 1 << 0));
++#endif
+   int rc = SQLITE_OK;
++#ifdef LLVM
+   if( 0==osStat(zFile, &sStat) ){
+     *pMode = sStat.st_mode & 0777;
+     *pUid = sStat.st_uid;
+     *pGid = sStat.st_gid;
++#else
++  if( 0==osStat(zFile, &pad.sStat) ){
++    *pMode = pad.sStat.st_mode & 0777;
++    *pUid = pad.sStat.st_uid;
++    *pGid = pad.sStat.st_gid;
++#endif
+   }else{
+     rc = SQLITE_IOERR_FSTAT;
+   }
+@@ -38827,7 +38965,15 @@
+   /* If argument zPath is a NULL pointer, this function is required to open
+   ** a temporary file. Use this buffer to store the file name in.
+   */
++#ifdef LLVM
+   char zTmpname[MAX_PATHNAME+2];
++#else
++	struct pad_s {
++		char zTmpname[4096];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(16, &pad.zTmpname, 4096, (1 << 21) | ( 1 << 0));
++#endif
++
+   const char *zName = zPath;
+ 
+   /* Check the following statements are true: 
+@@ -38888,12 +39034,19 @@
+   }else if( !zName ){
+     /* If zName is NULL, the upper layer is requesting a temp file. */
+     assert(isDelete && !isNewJrnl);
++#ifdef LLVM
+     rc = unixGetTempname(pVfs->mxPathname, zTmpname);
++#else
++    rc = unixGetTempname(pVfs->mxPathname, pad.zTmpname);
++#endif
+     if( rc!=SQLITE_OK ){
+       return rc;
+     }
++#ifdef LLVM
+     zName = zTmpname;
+-
++#else
++    zName = pad.zTmpname;
++#endif
+     /* Generated temporary filenames are always double-zero terminated
+     ** for use by sqlite3_uri_parameter(). */
+     assert( zName[strlen(zName)+1]==0 );
+@@ -39337,6 +39490,7 @@
+   */
+   memset(zBuf, 0, nBuf);
+   randomnessPid = osGetpid(0);  
++#define SQLITE_OMIT_RANDOMNESS
+ #if !defined(SQLITE_TEST) && !defined(SQLITE_OMIT_RANDOMNESS)
+   {
+     int fd, got;
+@@ -39427,9 +39581,19 @@
+   clock_gettime(CLOCK_REALTIME, &sNow);
+   *piNow = unixEpoch + 1000*(sqlite3_int64)sNow.tv_sec + sNow.tv_nsec/1000000;
+ #else
++#ifdef LLVM
+   struct timeval sNow;
+   (void)gettimeofday(&sNow, 0);  /* Cannot fail given valid arguments */
+   *piNow = unixEpoch + 1000*(sqlite3_int64)sNow.tv_sec + sNow.tv_usec/1000;
++#else
++	struct pad_s {
++		struct timeval sNow;
++		char empty[4096 - sizeof(struct timeval)];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(6, &pad.sNow, sizeof(struct timeval), (1 << 16) | ( 1 << 0));
++	(void)gettimeofday(&pad.sNow, 0);  /* Cannot fail given valid arguments */
++	*piNow = unixEpoch + 1000*(sqlite3_int64)pad.sNow.tv_sec + pad.sNow.tv_usec/1000;
++#endif
+ #endif
+ 
+ #ifdef SQLITE_TEST
+@@ -52125,9 +52289,19 @@
+ ** on success or an error code is something goes wrong.
+ */
+ static int write32bits(sqlite3_file *fd, i64 offset, u32 val){
++#ifdef LLVM
+   char ac[4];
+   put32bits(ac, val);
+   return sqlite3OsWrite(fd, ac, 4, offset);
++#else
++	struct pad_s {
++		char ac[4];
++		char empty[4092];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(15, &pad.ac, 4, (1 << 21) | ( 1 << 0));
++	put32bits(pad.ac, val);
++	return sqlite3OsWrite(fd, pad.ac, 4, offset);
++#endif
+ }
+ 
+ /*
+@@ -55302,10 +55476,23 @@
+         */
+         i64 iNextHdrOffset;
+         u8 aMagic[8];
++#ifdef LLVM
+         u8 zHeader[sizeof(aJournalMagic)+4];
++#else
++	struct pad_s {
++		u8 zHeader[sizeof(aJournalMagic)+4];
++		char empty[4096 - (sizeof(aJournalMagic)+4)];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(11, pad.zHeader, sizeof(aJournalMagic)+4,(1 << 0) | ( 1 << 21));
++#endif
+ 
++#ifdef LLVM
+         memcpy(zHeader, aJournalMagic, sizeof(aJournalMagic));
+         put32bits(&zHeader[sizeof(aJournalMagic)], pPager->nRec);
++#else
++        memcpy(pad.zHeader, aJournalMagic, sizeof(aJournalMagic));
++        put32bits(&pad.zHeader[sizeof(aJournalMagic)], pPager->nRec);
++#endif
+ 
+         iNextHdrOffset = journalHdrOffset(pPager);
+         rc = sqlite3OsRead(pPager->jfd, aMagic, 8, iNextHdrOffset);
+@@ -55335,8 +55522,13 @@
+           if( rc!=SQLITE_OK ) return rc;
+         }
+         IOTRACE(("JHDR %p %lld\n", pPager, pPager->journalHdr));
++
+         rc = sqlite3OsWrite(
++#ifdef LLVM
+             pPager->jfd, zHeader, sizeof(zHeader), pPager->journalHdr
++#else
++            pPager->jfd, pad.zHeader, sizeof(pad.zHeader), pPager->journalHdr
++#endif
+         );
+         if( rc!=SQLITE_OK ) return rc;
+       }
+@@ -56322,18 +56514,36 @@
+       ** detected.  The chance of an undetected change is so small that
+       ** it can be neglected.
+       */
++#ifdef LLVM
+       char dbFileVers[sizeof(pPager->dbFileVers)];
+-
+       IOTRACE(("CKVERS %p %d\n", pPager, sizeof(dbFileVers)));
+       rc = sqlite3OsRead(pPager->fd, &dbFileVers, sizeof(dbFileVers), 24);
++#else
++	struct pad_s {
++		char dbFileVers[sizeof(pPager->dbFileVers)];
++		char empty[4096 - sizeof(pPager->dbFileVers)];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(13, &pad.dbFileVers, sizeof(pPager->dbFileVers), (1 << 21) | ( 1 << 0));
++
++      IOTRACE(("CKVERS %p %d\n", pPager, sizeof(pad.dbFileVers)));
++      rc = sqlite3OsRead(pPager->fd, &pad.dbFileVers, sizeof(pad.dbFileVers), 24);
++#endif
++
+       if( rc!=SQLITE_OK ){
+         if( rc!=SQLITE_IOERR_SHORT_READ ){
+           goto failed;
+         }
++#ifdef LLVM
+         memset(dbFileVers, 0, sizeof(dbFileVers));
++#else
++        memset(pad.dbFileVers, 0, sizeof(pad.dbFileVers));
++#endif
+       }
+-
++#ifdef LLVM
+       if( memcmp(pPager->dbFileVers, dbFileVers, sizeof(dbFileVers))!=0 ){
++#else
++      if( memcmp(pPager->dbFileVers, pad.dbFileVers, sizeof(pad.dbFileVers))!=0 ){
++#endif
+         pager_reset(pPager);
+ 
+         /* Unmap the database file. It is possible that external processes

@@ -1,0 +1,37 @@
+--- a/newlib/libc/stdio/makebuf.c	2017-09-19 23:36:12.000000000 +0300
++++ b/newlib/libc/stdio/makebuf.c	2020-07-15 16:23:25.368000000 +0300
+@@ -93,9 +93,22 @@
+ 
+   if (fp->_file < 0 || _fstat64_r (ptr, fp->_file, &st) < 0)
+ #else
++#ifdef LLVM
+   struct stat st;
++#else
++	struct pad_s {
++		struct stat st;
++		char empty[4096 - sizeof(struct stat)];
++	} __attribute__ ((aligned (4096))) pad;
++	extern void app_ipc_add_stack(int i, void *begin, size_t size, int mask);
++	app_ipc_add_stack(3, &pad.st, sizeof(struct stat), (1 << 21) | ( 1 << 0));
++#endif
+ 
++#ifdef LLVM
+   if (fp->_file < 0 || _fstat_r (ptr, fp->_file, &st) < 0)
++#else
++  if (fp->_file < 0 || _fstat_r (ptr, fp->_file, &pad.st) < 0)
++#endif
+ #endif
+     {
+       *couldbetty = 0;
+@@ -108,7 +121,11 @@
+     }
+ 
+   /* could be a tty iff it is a character device */
++#ifdef LLVM
+   *couldbetty = S_ISCHR(st.st_mode);
++#else
++  *couldbetty = S_ISCHR(pad.st.st_mode);
++#endif
+ #ifdef HAVE_BLKSIZE
+   if (st.st_blksize > 0)
+     {

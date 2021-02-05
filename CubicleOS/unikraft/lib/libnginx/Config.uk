@@ -1,0 +1,28 @@
+menuconfig LIBNGINX
+	bool "libnginx - Nginx"
+	default n
+	select LIBUKSCHEDCOOP
+	select LIBSYSCALL_SHIM
+	select LIBPOSIX_LIBDL
+	select LIBPOSIX_PROCESS
+	select LIBPOSIX_USER
+	select LIBPOSIX_SYSINFO
+	select LIBUKMMAP
+	select LIBUKTIME
+	select LIBNEWLIBC
+	select LIBLWIP
+	select LWIP_TCP
+	select LWIP_WND_SCALE
+	select LWIP_TCP_KEEPALIVE
+	select LWIP_THREADS
+	select LWIP_SOCKET
+	select LWIP_AUTOIFACE
+	select LWIP_IPV4
+	select LWIP_DNS
+
+
+if LIBNGINX
+config LIBNGINX_MAIN_FUNCTION
+	bool "Provide main function"
+	default n
+endif

@@ -1,0 +1,95 @@
+diff -uarN sqlite-amalgamation-3300100/dlmemreq.c sqlite-amalgamation-3300100_new/dlmemreq.c
+--- sqlite-amalgamation-3300100/dlmemreq.c	2020-07-15 00:16:02.060000000 +0300
++++ sqlite-amalgamation-3300100/dlmemreq.c	2020-07-13 19:19:47.448000000 +0300
+@@ -26,7 +26,7 @@
+ 
+ static void *u_ch_start = NULL;
+ static long u_ch_ctr = 0;
+-static long u_ch_size = (CONFIG_LINUXU_DEFAULT_HEAPMB*1024LL*1024/4);
++static long u_ch_size = (CONFIG_LINUXU_DEFAULT_HEAPMB*1024*1024LL/4);
+ 
+ char* u_get_memory(unsigned num_bytes) {
+ #ifdef DEBUG
+diff -uarN sqlite-amalgamation-3300100/sqlite3.c sqlite-amalgamation-3300100_new/sqlite3.c
+--- sqlite-amalgamation-3300100/sqlite3.c	2020-07-15 00:16:02.048000000 +0300
++++ sqlite-amalgamation-3300100/sqlite3.c	2020-07-15 00:07:57.188000000 +0300
+@@ -3,6 +3,8 @@
+ void dl2free(void *ptr);
+ void *dl2realloc(void *ptr, int size);
+ 
++#include "ipc.h"
++
+ /****************
+ **************************************************************
+ ** This file is an amalgamation of many separate C source files from SQLite
+@@ -38494,6 +38496,13 @@
+      "/tmp",
+      "."
+   };
++
++//femto
++	struct pad_s {
++		char path[4096];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(1, &pad.path, 4096, (1 << 21) | ( 1 << 0));
++
+   unsigned int i = 0;
+   struct stat buf;
+   const char *zDir = sqlite3_temp_directory;
+@@ -38501,10 +38510,21 @@
+   if( !azDirs[0] ) azDirs[0] = getenv("SQLITE_TMPDIR");
+   if( !azDirs[1] ) azDirs[1] = getenv("TMPDIR");
+   while(1){
++	if(zDir) {
++		strcpy(pad.path, zDir);
++	}
+     if( zDir!=0
++#ifdef LLVM
+      && osStat(zDir, &buf)==0
++#else
++     && osStat(pad.path, &buf)==0
++#endif
+      && S_ISDIR(buf.st_mode)
++#ifdef LLVM
+      && osAccess(zDir, 03)==0
++#else
++     && osAccess(pad.path, 03)==0
++#endif
+     ){
+       return zDir;
+     }
+@@ -39265,6 +39285,7 @@
+ /*
+ ** Write nBuf bytes of random data to the supplied buffer zBuf.
+ */
++
+ static int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf){
+   UNUSED_PARAMETER(NotUsed);
+   assert((size_t)nBuf>=(sizeof(time_t)+sizeof(int)));
+@@ -39286,7 +39307,16 @@
+ #if !defined(SQLITE_TEST) && !defined(SQLITE_OMIT_RANDOMNESS)
+   {
+     int fd, got;
++#ifdef LLVM
+     fd = robust_open("/dev/urandom", O_RDONLY, 0);
++#else
++	struct pad_s {
++		char path[4096];
++	} __attribute__ ((aligned (4096))) pad;
++	app_ipc_add_stack(0, &pad.path, 4096, (1 << 21) | ( 1 << 0));
++	memcpy(&pad.path, "/dev/urandom", sizeof("/dev/urandom"));
++	fd = robust_open(pad.path, O_RDONLY, 0);
++#endif
+     if( fd<0 ){
+       time_t t;
+       time(&t);
+@@ -55777,6 +55807,9 @@
+     if( nUri ) memcpy(&pPager->zFilename[nPathname+1], zUri, nUri);
+     memcpy(pPager->zJournal, zPathname, nPathname);
+     memcpy(&pPager->zJournal[nPathname], "-journal\000", 8+2);
++//FEMTO
++    app_ipc_add_heap(pPager->zJournal, nPathname+8+2, (1 << 0) || (1 << 21));
++//
+     sqlite3FileSuffix3(pPager->zFilename, pPager->zJournal);
+ #ifndef SQLITE_OMIT_WAL
+     pPager->zWal = &pPager->zJournal[nPathname+8+1];

@@ -1,0 +1,79 @@
+--- /dev/null	2020-07-07 11:38:57.748000000 +0300
++++ sqlite-amalgamation-3300100/ipc.c	2020-07-15 00:06:04.152000000 +0300
+@@ -0,0 +1,76 @@
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <stdlib.h>
++#include <sys/param.h>
++
++#include <vfscore/dentry.h>
++#include <vfscore/vnode.h>
++
++#include <uk/essentials.h>
++
++//stack
++struct ipc_struct APP_ipc_tab_stack[] __attribute__((aligned(4096))) = {
++//dev/random
++	{0, 4096, (1 << 21) | ( 1 << 0)},
++//tmp stat
++	{0, 4096, (1 << 21) | ( 1 << 0)},
++};
++int APP_ipc_tab_stack_nr = sizeof(APP_ipc_tab_stack)/sizeof(struct ipc_struct);
++
++void APP_ipc_add_stack(char *begin, int size, int mask) {
++	APP_ipc_tab_stack[0].begin = begin;
++	APP_ipc_tab_stack[0].size = size;
++	APP_ipc_tab_stack[0].mask = mask;
++}
++
++//globals
++struct ipc_struct APP_ipc_tab_globals[] __attribute__((aligned(4096))) = {
++};
++int APP_ipc_tab_globals_nr = sizeof(APP_ipc_tab_globals)/sizeof(struct ipc_struct);
++
++//heap
++#define HEAP_MAX	100
++struct ipc_struct APP_ipc_tab_heap[HEAP_MAX] __attribute__((aligned(4096))) = {
++};
++int APP_ipc_tab_heap_nr = HEAP_MAX;
++
++
++void app_ipc_remove_heap(void *begin) {
++	for(int i = 0; i < HEAP_MAX; i++) {
++		if(APP_ipc_tab_heap[i].begin != begin)
++			continue;
++
++		APP_ipc_tab_heap[i].begin = 0;
++		APP_ipc_tab_heap[i].size = 0;
++		APP_ipc_tab_heap[i].mask = 0;
++
++		return;
++	}
++
++	uk_pr_crit("Entry with begin %p doesn exist\n", begin);
++	while(1);
++}
++
++void app_ipc_add_heap(void *begin, size_t size, int mask) {
++	uk_pr_crit("Add %p %x %x \n", begin, size, mask);
++	for(int i = 0; i < HEAP_MAX; i++) {
++		if(APP_ipc_tab_heap[i].size != 0)
++			continue;
++
++		APP_ipc_tab_heap[i].begin = begin;
++		APP_ipc_tab_heap[i].size = size;
++		APP_ipc_tab_heap[i].mask = mask;
++
++		return;
++	}
++
++	uk_pr_crit("add more records to SQLITE ipc struct\n");
++	while(1);
++}
++
++void app_ipc_add_stack(int i, void *begin, size_t size, int mask) {
++		APP_ipc_tab_stack[i].begin = begin;
++		APP_ipc_tab_stack[i].size = size;
++		APP_ipc_tab_stack[i].mask = mask;
++}

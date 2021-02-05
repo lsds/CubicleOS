@@ -1,0 +1,224 @@
+--- a/ipc.c	2020-07-25 23:19:42.368000000 +0300
++++ b/ipc.c	2020-07-25 23:15:07.956000000 +0300
+@@ -62,7 +62,8 @@
+ int APP_ipc_tab_globals_nr = sizeof(APP_ipc_tab_globals)/sizeof(struct ipc_struct);
+ 
+ //heap
+-#define HEAP_MAX	1500
++#define HEAP_MAX	20
++#define HEAP_MIN	0
+ struct ipc_struct APP_ipc_tab_heap[HEAP_MAX] __attribute__((aligned(4096))) = {
+ };
+ int APP_ipc_tab_heap_nr = HEAP_MAX;
+@@ -70,10 +71,12 @@
+ 
+ void app_ipc_remove_heap(void *begin) {
+ //	uk_pr_crit("REMOVE %p  \n", begin);
+-	for(int i = 0; i < HEAP_MAX; i++) {
++	for(int i = HEAP_MIN; i < HEAP_MAX; i++) {
+ 		if(APP_ipc_tab_heap[i].begin != begin)
+ 			continue;
+ 
++// this code should map back unmaped pages, but in fact we don't need to do this
++// heap pages are our pages 'forever', and they will be remaped automatically on use
+ 		APP_ipc_tab_heap[i].begin = 0;
+ 		APP_ipc_tab_heap[i].size = 0;
+ 		APP_ipc_tab_heap[i].mask = 0;
+@@ -81,13 +84,18 @@
+ 		return;
+ 	}
+ 
+-//	uk_pr_crit("Entry with begin %p doesn exist\n", begin);
+-//	while(1);
++	uk_pr_crit("Entry with begin %p doesn exist\n", begin);
++	for(int i = 0; i < HEAP_MAX; i++) {
++		uk_pr_crit("[%d] %p %x %x\n", i, APP_ipc_tab_heap[i].begin, APP_ipc_tab_heap[i].size, APP_ipc_tab_heap[i].mask);
++	}
++
++
++	while(1);
+ }
+ 
+ void app_ipc_add_heap(void *begin, size_t size, int mask) {
+ //	uk_pr_crit("Add %p %x %x \n", begin, size, mask);
+-	for(int i = 0; i < HEAP_MAX; i++) {
++	for(int i = HEAP_MIN; i < HEAP_MAX; i++) {
+ 		if(APP_ipc_tab_heap[i].size != 0)
+ 			continue;
+ 
+@@ -99,6 +107,11 @@
+ 	}
+ 
+ 	uk_pr_crit("add more records to SQLITE ipc struct\n");
++	for(int i = 0; i < HEAP_MAX; i++) {
++		uk_pr_crit("[%d] %p %x %x\n", i, APP_ipc_tab_heap[i].begin, APP_ipc_tab_heap[i].size, APP_ipc_tab_heap[i].mask);
++	}
++
++
+ 	while(1);
+ }
+ 
+diff -uar a/sqlite3.c b/sqlite3.c
+--- a/sqlite3.c	2020-07-25 23:19:42.388000000 +0300
++++ b/sqlite3.c	2020-07-25 16:26:46.692000000 +0300
+@@ -22,9 +22,9 @@
+ }
+ 
+ void dl3free(void *ptr) {
+-//	printf("FREE %p\n", ptr);
+-	if(ptr)
+-		app_ipc_remove_heap(ptr);
++////	printf("FREE %p\n", ptr);
++//	if(ptr)
++//		app_ipc_remove_heap(ptr);
+ 	dl2free(ptr);
+ }
+ 
+@@ -36279,7 +36279,9 @@
+   }
+ #endif
+ 
++    app_ipc_add_heap(pBuf, amt, (1 << 0) | ( 1 << 21) );
+   got = seekAndRead(pFile, offset, pBuf, amt);
++    app_ipc_remove_heap(pBuf);
+   if( got==amt ){
+     return SQLITE_OK;
+   }else if( got<0 ){
+@@ -36413,12 +36415,15 @@
+     }
+   }
+ #endif
+- 
++
++    app_ipc_add_heap(pBuf, amt, (1 << 0) | ( 1 << 21) );
+   while( (wrote = seekAndWrite(pFile, offset, pBuf, amt))<amt && wrote>0 ){
+     amt -= wrote;
+     offset += wrote;
+     pBuf = &((char*)pBuf)[wrote];
+   }
++    app_ipc_remove_heap(pBuf);
++
+   SimulateIOError(( wrote=(-1), amt=1 ));
+   SimulateDiskfullError(( wrote=0, amt=1 ));
+ 
+@@ -39296,9 +39301,13 @@
+   int nPath = sqlite3Strlen30(zPath);
+   int iOff = 0;
+   if( zPath[0]!='/' ){
++    app_ipc_add_heap(zOut, nOut-2, (1 << 0) | ( 1 << 21) );
+     if( osGetcwd(zOut, nOut-2)==0 ){
++	app_ipc_remove_heap(zOut);
+       return unixLogError(SQLITE_CANTOPEN_BKPT, "getcwd", zPath);
+     }
++    app_ipc_remove_heap(zOut);
++
+     iOff = sqlite3Strlen30(zOut);
+     zOut[iOff++] = '/';
+   }
+@@ -39353,6 +39362,7 @@
+     int bLink = 0;
+ //TODO_FEMTO
+     struct stat buf;
++    app_ipc_add_heap(zIn, strlen(zIn), (1 << 0) | ( 1 << 21) );
+     if( osLstat(zIn, &buf)!=0 ){
+       if( errno!=ENOENT ){
+         rc = unixLogError(SQLITE_CANTOPEN_BKPT, "lstat", zIn);
+@@ -39360,7 +39370,7 @@
+     }else{
+       bLink = S_ISLNK(buf.st_mode);
+     }
+-
++    app_ipc_remove_heap(zIn);
+     if( bLink ){
+       if( zDel==0 ){
+         zDel = sqlite3_malloc(nOut);
+@@ -49510,7 +49520,7 @@
+   }
+   zBulk = pCache->pBulk = sqlite3Malloc( szBulk );
+   sqlite3EndBenignMalloc();
+-    app_ipc_add_heap(zBulk, szBulk, (1 << 0) | ( 1 << 21));
++    //app_ipc_add_heap(zBulk, szBulk, (1 << 0) | ( 1 << 21));
+   if( zBulk ){
+     int nBulk = sqlite3MallocSize(zBulk)/pCache->szAlloc;
+     do{
+@@ -49668,7 +49678,6 @@
+     p->isAnchor = 0;
+   }
+   (*pCache->pnPurgeable)++;
+-    app_ipc_add_heap(pPg, pCache->szAlloc, (1 << 21) | ( 1 << 0));
+   return p;
+ }
+ 
+@@ -54950,7 +54959,7 @@
+       if( !pNew ){
+         rc = SQLITE_NOMEM_BKPT;
+       }else{
+-	app_ipc_add_heap(pNew, pageSize+8, (1 << 0) | (1 << 21));
++	//app_ipc_add_heap(pNew, pageSize+8, (1 << 0) | (1 << 21));
+         memset(pNew+pageSize, 0, 8);
+       }
+     }
+@@ -55967,7 +55976,7 @@
+       return SQLITE_NOMEM_BKPT;
+     }
+ 
+-	app_ipc_add_heap(zPathname, 1024, (1 << 21) | (1 << 0));
++	//app_ipc_add_heap(zPathname, 1024, (1 << 21) | (1 << 0));
+     zPathname[0] = 0; /* Make sure initialized even if FullPathname() fails */
+     rc = sqlite3OsFullPathname(pVfs, zFilename, nPathname, zPathname);
+     nPathname = sqlite3Strlen30(zPathname);
+@@ -56028,7 +56037,7 @@
+   pPager->jfd =  (sqlite3_file*)(pPtr += journalFileSize);
+   pPager->zFilename =    (char*)(pPtr += journalFileSize);
+ //todo: split pPager into separate aligned blocks and add zFilename and zJournal
+-    app_ipc_add_heap(pPtr, 0x2b8, (1 << 0) | (1 << 21));
++    app_ipc_add_heap(pPtr, 0x1000, (1 << 0) | (1 << 21));
+   assert( EIGHT_BYTE_ALIGNMENT(pPager->jfd) );
+ 
+   /* Fill in the Pager.zFilename and Pager.zJournal buffers, if required. */
+@@ -56039,9 +56048,7 @@
+     if( nUri ) memcpy(&pPager->zFilename[nPathname+1], zUri, nUri);
+     memcpy(pPager->zJournal, zPathname, nPathname);
+     memcpy(&pPager->zJournal[nPathname], "-journal\000", 8+2);
+-//FEMTO
+-//    app_ipc_add_heap(pPager->zJournal, nPathname+8+2, (1 << 0) || (1 << 21));
+-//
++
+     sqlite3FileSuffix3(pPager->zFilename, pPager->zJournal);
+ #ifndef SQLITE_OMIT_WAL
+     pPager->zWal = &pPager->zJournal[nPathname+8+1];
+@@ -66489,7 +66496,7 @@
+     */
+     if( pBt->pTmpSpace ){
+ //FEMTO
+-	app_ipc_add_heap(pBt->pTmpSpace, pBt->pageSize, (1 << 21) | ( 1 << 0));
++	//app_ipc_add_heap(pBt->pTmpSpace, pBt->pageSize, (1 << 21) | ( 1 << 0));
+ //1
+ 
+       memset(pBt->pTmpSpace, 0, 8);
+@@ -93350,7 +93357,7 @@
+     if( pReadr->aBuffer==0 ){
+       pReadr->aBuffer = (u8*)sqlite3Malloc(pgsz);
+       if( pReadr->aBuffer==0 ) rc = SQLITE_NOMEM_BKPT;
+-	app_ipc_add_heap(pReadr->aBuffer, pgsz, (1 << 21) | (1 << 0));
++	//app_ipc_add_heap(pReadr->aBuffer, pgsz, (1 << 21) | (1 << 0));
+       pReadr->nBuffer = pgsz;
+     }
+     if( rc==SQLITE_OK && iBuf ){
+@@ -159841,7 +159848,7 @@
+     rc = SQLITE_MISUSE_BKPT;  /* IMP: R-65497-44594 */
+   }else{
+     rc = sqlite3ParseUri(zVfs, zFilename, &flags, &db->pVfs, &zOpen, &zErrMsg);
+-    app_ipc_add_heap(zOpen, 1024, (1 << 0) | ( 1 << 21));
++    //app_ipc_add_heap(zOpen, 1024, (1 << 0) | ( 1 << 21));
+   }
+   if( rc!=SQLITE_OK ){
+     if( rc==SQLITE_NOMEM ) sqlite3OomFault(db);
+@@ -160007,7 +160014,6 @@
+   if( rc==SQLITE_OK ) sqlite3CodecQueryParameters(db, 0, zOpen);
+ #endif
+ 
+-	app_ipc_remove_heap(zOpen);
+   sqlite3_free(zOpen);
+   return rc & 0xff;
+ }

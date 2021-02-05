@@ -1,0 +1,14 @@
+--- a/platform/helper/tls-helper.c
++++ b/platform/helper/tls-helper.c
+@@ -49,6 +49,11 @@
+ 
+   if (keysUsed != NULL)
+     {
++//
++	extern void ukboot_ipc_add_heap(void *, size_t, int);
++	ukboot_ipc_add_heap(keysUsed, maxEntries * sizeof(int), (1 << 0 ) | (1 << 25));
++//
++
+       for (i=0;i<maxEntries;i++)
+         {
+           keysUsed[i] = 0;

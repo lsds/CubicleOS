@@ -1,0 +1,300 @@
+--- sqlite-amalgamation-3300100/sqlite3.c	2020-06-08 06:52:59.527171189 +0000
++++ sqlite-amalgamation-3300100/sqlite3.c	2020-06-08 08:01:42.807151263 +0000
+@@ -33057,7 +33057,129 @@
+ static int posixOpen(const char *zFile, int flags, int mode){
+   return open(zFile, flags, mode);
+ }
++/////////////
++static int wrap_close(int a) {
++	return close(a);
++}
++
++static int wrap_access(const char *a, int b) {
++	return access(a, b);
++}
++
++static char *wrap_getcwd(char *a, size_t b) {
++	return getcwd(a, b);
++}
++
++static int wrap_stat(const char *a, struct stat *b) {
++	return stat(a, b);
++}
++
++static int wrap_fstat(int a,struct stat *b) {
++	return fstat(a, b);
++}
++
++static int wrap_ftruncate(int a, off_t b) {
++	return ftruncate(a, b);
++}
++
++//#define osFcntl     ((int(*)(int,int,...))aSyscall[7].pCurrent)
++static int wrap_fcntl(int a, int b, unsigned long c) {
++	return fcntl(a, b, c);
++}
++
++static ssize_t wrap_read(int a,void *b, size_t c) {
++	return read(a,b,c);
++}
++
++static ssize_t wrap_pread(int a, void *b, size_t c, off_t d) {
++	return pread(a, b, c, d);
++}
++
++//#define osPread64 ((ssize_t(*)(int,void*,size_t,off64_t))aSyscall[10].pCurrent)
++static ssize_t wrap_pread64(int a,void *b, size_t c, off64_t d) {
++	return pread64(a, b, c, d);
++}
++
++//#define osWrite     ((ssize_t(*)(int,const void*,size_t))aSyscall[11].pCurrent)
++static ssize_t wrap_write(int a, const void *b, size_t c) {
++	return write(a, b, c);
++}
++
++//#define osPwrite    (((*)(int,const void*,size_t,off_t))
++static ssize_t wrap_pwrite(int a, const void *b, size_t c, off_t d) {
++	return pwrite(a, b, c, d);
++}
++
++//#define osPwrite64  ((ssize_t(*)(int,const void*,size_t,off64_t))
++static ssize_t wrap_pwrite64(int a, const void *b, size_t c, off64_t d) {
++	return pwrite64(a, b, c, d);
++}
++
++//#define osFchmod    ((int(*)(int,mode_t))aSyscall[14].pCurrent)
++static int wrap_fchmod(int a, mode_t b) {
++	return fchmod(a, b);
++}
++
++//#define osFallocate ((int(*)(int,off_t,off_t))aSyscall[15].pCurrent)
++static int wrap_fallocate(int a, off_t b, off_t c) {
++	return fallocate(a, b, c);
++}
++
++//#define osUnlink    ((int(*)(const char*))aSyscall[16].pCurrent)
++static int wrap_unlink(const char *a) {
++	return unlink(a);
++}
++
++//#define osMkdir     ((int(*)(const char*,mode_t))aSyscall[18].pCurrent)
++static int wrap_mkdir(const char *a, mode_t b) {
++	return mkdir(a, b);
++}
++
++//#define osRmdir     ((int(*)(const char*))aSyscall[19].pCurrent)
++static int wrap_rmdir(const char *a) {
++	return rmdir(a);
++}
++
++//#define osFchown    ((int(*)(int,uid_t,gid_t))aSyscall[20].pCurrent)
++static int wrap_fchown(int a, uid_t b, gid_t c) {
++	return fchown(a, b, c);
++}
++
++//#define osGeteuid   ((uid_t(*)(void))aSyscall[21].pCurrent)
++static uid_t wrap_geteuid(void) {
++	return geteuid();
++}
++
++//#define osMmap ((void*(*)(void*,size_t,int,int,int,off_t))aSyscall[22].pCurrent)
++static void *wrap_mmap(void *a, size_t b, int c, int d, int e, off_t f) {
++	return mmap(a, b, c, d, e, f);
++}
++
++//#define osMunmap ((int(*)(void*,size_t))aSyscall[23].pCurrent)
++static int wrap_munmap(void *a, size_t b) {
++	return munmap(a, b);
++}
++
++//#define osMremap ((void*(*)(void*,size_t,size_t,int,...))aSyscall[24].pCurrent)
++static void *wrap_mremap(void *a, size_t b, size_t c, int d) {
++	printf("not supported %s\n", __func__); while(1);
++}
++
++//#define osReadlink ((ssize_t(*)(const char*,char*,size_t))aSyscall[26].pCurrent)
++static ssize_t wrap_readlink(const char *a, char *b, size_t c) {
++	return readlink(a, b, c);
++}
++
++//#define osLstat      ((int(*)(const char*,struct stat*))aSyscall[27].pCurrent)
++static int wrap_lstat(const char *a, struct stat *b) {
++	return lstat(a, b);
++}
++
++static int wrap_ioctl(int a, unsigned long b) {
++	printf("not supported %s\n", __func__); while(1);
++}
+ 
++/////////////
+ /* Forward reference */
+ static int openDirectory(const char*, int*);
+ static int unixGetpagesize(void);
+@@ -33076,16 +33198,16 @@
+   { "open",         (sqlite3_syscall_ptr)posixOpen,  0  },
+ #define osOpen      ((int(*)(const char*,int,int))aSyscall[0].pCurrent)
+ 
+-  { "close",        (sqlite3_syscall_ptr)close,      0  },
++  { "close",        (sqlite3_syscall_ptr)wrap_close,      0  },
+ #define osClose     ((int(*)(int))aSyscall[1].pCurrent)
+ 
+-  { "access",       (sqlite3_syscall_ptr)access,     0  },
++  { "access",       (sqlite3_syscall_ptr)wrap_access,     0  },
+ #define osAccess    ((int(*)(const char*,int))aSyscall[2].pCurrent)
+ 
+-  { "getcwd",       (sqlite3_syscall_ptr)getcwd,     0  },
++  { "getcwd",       (sqlite3_syscall_ptr)wrap_getcwd,     0  },
+ #define osGetcwd    ((char*(*)(char*,size_t))aSyscall[3].pCurrent)
+ 
+-  { "stat",         (sqlite3_syscall_ptr)stat,       0  },
++  { "stat",         (sqlite3_syscall_ptr)wrap_stat,       0  },
+ #define osStat      ((int(*)(const char*,struct stat*))aSyscall[4].pCurrent)
+ 
+ /*
+@@ -33098,38 +33220,38 @@
+   { "fstat",        0,                 0  },
+ #define osFstat(a,b,c)    0
+ #else     
+-  { "fstat",        (sqlite3_syscall_ptr)fstat,      0  },
++  { "fstat",        (sqlite3_syscall_ptr)wrap_fstat,      0  },
+ #define osFstat     ((int(*)(int,struct stat*))aSyscall[5].pCurrent)
+ #endif
+ 
+-  { "ftruncate",    (sqlite3_syscall_ptr)ftruncate,  0  },
++  { "ftruncate",    (sqlite3_syscall_ptr)wrap_ftruncate,  0  },
+ #define osFtruncate ((int(*)(int,off_t))aSyscall[6].pCurrent)
+ 
+-  { "fcntl",        (sqlite3_syscall_ptr)fcntl,      0  },
++  { "fcntl",        (sqlite3_syscall_ptr)wrap_fcntl,      0  },
+ #define osFcntl     ((int(*)(int,int,...))aSyscall[7].pCurrent)
+ 
+-  { "read",         (sqlite3_syscall_ptr)read,       0  },
++  { "read",         (sqlite3_syscall_ptr)wrap_read,       0  },
+ #define osRead      ((ssize_t(*)(int,void*,size_t))aSyscall[8].pCurrent)
+ 
+ #if defined(USE_PREAD) || SQLITE_ENABLE_LOCKING_STYLE
+-  { "pread",        (sqlite3_syscall_ptr)pread,      0  },
++  { "pread",        (sqlite3_syscall_ptr)wrap_pread,      0  },
+ #else
+   { "pread",        (sqlite3_syscall_ptr)0,          0  },
+ #endif
+ #define osPread     ((ssize_t(*)(int,void*,size_t,off_t))aSyscall[9].pCurrent)
+ 
+ #if defined(USE_PREAD64)
+-  { "pread64",      (sqlite3_syscall_ptr)pread64,    0  },
++  { "pread64",      (sqlite3_syscall_ptr)wrap_pread64,    0  },
+ #else
+   { "pread64",      (sqlite3_syscall_ptr)0,          0  },
+ #endif
+ #define osPread64 ((ssize_t(*)(int,void*,size_t,off64_t))aSyscall[10].pCurrent)
+ 
+-  { "write",        (sqlite3_syscall_ptr)write,      0  },
++  { "write",        (sqlite3_syscall_ptr)wrap_write,      0  },
+ #define osWrite     ((ssize_t(*)(int,const void*,size_t))aSyscall[11].pCurrent)
+ 
+ #if defined(USE_PREAD) || SQLITE_ENABLE_LOCKING_STYLE
+-  { "pwrite",       (sqlite3_syscall_ptr)pwrite,     0  },
++  { "pwrite",       (sqlite3_syscall_ptr)wrap_pwrite,     0  },
+ #else
+   { "pwrite",       (sqlite3_syscall_ptr)0,          0  },
+ #endif
+@@ -33137,14 +33259,14 @@
+                     aSyscall[12].pCurrent)
+ 
+ #if defined(USE_PREAD64)
+-  { "pwrite64",     (sqlite3_syscall_ptr)pwrite64,   0  },
++  { "pwrite64",     (sqlite3_syscall_ptr)wrap_pwrite64,   0  },
+ #else
+   { "pwrite64",     (sqlite3_syscall_ptr)0,          0  },
+ #endif
+ #define osPwrite64  ((ssize_t(*)(int,const void*,size_t,off64_t))\
+                     aSyscall[13].pCurrent)
+ 
+-  { "fchmod",       (sqlite3_syscall_ptr)fchmod,          0  },
++  { "fchmod",       (sqlite3_syscall_ptr)wrap_fchmod,          0  },
+ #define osFchmod    ((int(*)(int,mode_t))aSyscall[14].pCurrent)
+ 
+ #if defined(HAVE_POSIX_FALLOCATE) && HAVE_POSIX_FALLOCATE
+@@ -33154,48 +33276,48 @@
+ #endif
+ #define osFallocate ((int(*)(int,off_t,off_t))aSyscall[15].pCurrent)
+ 
+-  { "unlink",       (sqlite3_syscall_ptr)unlink,           0 },
++  { "unlink",       (sqlite3_syscall_ptr)wrap_unlink,           0 },
+ #define osUnlink    ((int(*)(const char*))aSyscall[16].pCurrent)
+ 
+   { "openDirectory",    (sqlite3_syscall_ptr)openDirectory,      0 },
+ #define osOpenDirectory ((int(*)(const char*,int*))aSyscall[17].pCurrent)
+ 
+-  { "mkdir",        (sqlite3_syscall_ptr)mkdir,           0 },
++  { "mkdir",        (sqlite3_syscall_ptr)wrap_mkdir,           0 },
+ #define osMkdir     ((int(*)(const char*,mode_t))aSyscall[18].pCurrent)
+ 
+-  { "rmdir",        (sqlite3_syscall_ptr)rmdir,           0 },
++  { "rmdir",        (sqlite3_syscall_ptr)wrap_rmdir,           0 },
+ #define osRmdir     ((int(*)(const char*))aSyscall[19].pCurrent)
+ 
+ #if defined(HAVE_FCHOWN)
+-  { "fchown",       (sqlite3_syscall_ptr)fchown,          0 },
++  { "fchown",       (sqlite3_syscall_ptr)wrap_fchown,          0 },
+ #else
+   { "fchown",       (sqlite3_syscall_ptr)0,               0 },
+ #endif
+ #define osFchown    ((int(*)(int,uid_t,gid_t))aSyscall[20].pCurrent)
+ 
+ #if defined(HAVE_FCHOWN)
+-  { "geteuid",      (sqlite3_syscall_ptr)geteuid,         0 },
++  { "geteuid",      (sqlite3_syscall_ptr)wrap_geteuid,         0 },
+ #else
+   { "geteuid",      (sqlite3_syscall_ptr)0,               0 },
+ #endif
+ #define osGeteuid   ((uid_t(*)(void))aSyscall[21].pCurrent)
+ 
+ #if !defined(SQLITE_OMIT_WAL) || SQLITE_MAX_MMAP_SIZE>0
+-  { "mmap",         (sqlite3_syscall_ptr)mmap,            0 },
++  { "mmap",         (sqlite3_syscall_ptr)wrap_mmap,            0 },
+ #else
+   { "mmap",         (sqlite3_syscall_ptr)0,               0 },
+ #endif
+ #define osMmap ((void*(*)(void*,size_t,int,int,int,off_t))aSyscall[22].pCurrent)
+ 
+ #if !defined(SQLITE_OMIT_WAL) || SQLITE_MAX_MMAP_SIZE>0
+-  { "munmap",       (sqlite3_syscall_ptr)munmap,          0 },
++  { "munmap",       (sqlite3_syscall_ptr)wrap_munmap,          0 },
+ #else
+   { "munmap",       (sqlite3_syscall_ptr)0,               0 },
+ #endif
+ #define osMunmap ((int(*)(void*,size_t))aSyscall[23].pCurrent)
+ 
+ #if HAVE_MREMAP && (!defined(SQLITE_OMIT_WAL) || SQLITE_MAX_MMAP_SIZE>0)
+-  { "mremap",       (sqlite3_syscall_ptr)mremap,          0 },
++  { "mremap",       (sqlite3_syscall_ptr)wrap_mremap,          0 },
+ #else
+   { "mremap",       (sqlite3_syscall_ptr)0,               0 },
+ #endif
+@@ -33209,14 +33331,14 @@
+ #define osGetpagesize ((int(*)(void))aSyscall[25].pCurrent)
+ 
+ #if defined(HAVE_READLINK)
+-  { "readlink",     (sqlite3_syscall_ptr)readlink,        0 },
++  { "readlink",     (sqlite3_syscall_ptr)wrap_readlink,        0 },
+ #else
+   { "readlink",     (sqlite3_syscall_ptr)0,               0 },
+ #endif
+ #define osReadlink ((ssize_t(*)(const char*,char*,size_t))aSyscall[26].pCurrent)
+ 
+ #if defined(HAVE_LSTAT)
+-  { "lstat",         (sqlite3_syscall_ptr)lstat,          0 },
++  { "lstat",         (sqlite3_syscall_ptr)wrap_lstat,          0 },
+ #else
+   { "lstat",         (sqlite3_syscall_ptr)0,              0 },
+ #endif
+@@ -33227,7 +33349,7 @@
+   { "ioctl", (sqlite3_syscall_ptr)(int(*)(int, int, ...))ioctl, 0 },
+ #define osIoctl ((int(*)(int,int,...))aSyscall[28].pCurrent)
+ # else
+-  { "ioctl",         (sqlite3_syscall_ptr)ioctl,          0 },
++  { "ioctl",         (sqlite3_syscall_ptr)wrap_ioctl,          0 },
+ #define osIoctl ((int(*)(int,unsigned long,...))aSyscall[28].pCurrent)
+ # endif
+ #else
