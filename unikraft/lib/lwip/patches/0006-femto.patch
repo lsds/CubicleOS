@@ -1,0 +1,12 @@
+--- a/src/api/tcpip.c
++++ b/src/api/tcpip.c
+@@ -239,7 +239,8 @@
+ err_t
+ tcpip_inpkt(struct pbuf *p, struct netif *inp, netif_input_fn input_fn)
+ {
+-#if LWIP_TCPIP_CORE_LOCKING_INPUT
++//#if LWIP_TCPIP_CORE_LOCKING_INPUT
++#if 1
+   err_t ret;
+   LWIP_DEBUGF(TCPIP_DEBUG, ("tcpip_inpkt: PACKET %p/%p\n", (void *)p, (void *)inp));
+   LOCK_TCPIP_CORE();

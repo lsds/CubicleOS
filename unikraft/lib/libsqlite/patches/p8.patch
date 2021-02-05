@@ -1,0 +1,206 @@
+diff -uarN sqlite-amalgamation-3300100_old/ipc.c sqlite-amalgamation-3300100/ipc.c
+--- sqlite-amalgamation-3300100_old/ipc.c	2020-07-15 00:06:04.152000000 +0300
++++ sqlite-amalgamation-3300100/ipc.c	2020-07-15 14:41:53.636000000 +0300
+@@ -15,6 +15,8 @@
+ 	{0, 4096, (1 << 21) | ( 1 << 0)},
+ //tmp stat
+ 	{0, 4096, (1 << 21) | ( 1 << 0)},
++//speed test version
++	{0, 1024, (1 << 21) | ( 1 << 0)},
+ };
+ int APP_ipc_tab_stack_nr = sizeof(APP_ipc_tab_stack)/sizeof(struct ipc_struct);
+ 
+@@ -30,13 +32,14 @@
+ int APP_ipc_tab_globals_nr = sizeof(APP_ipc_tab_globals)/sizeof(struct ipc_struct);
+ 
+ //heap
+-#define HEAP_MAX	100
++#define HEAP_MAX	1500
+ struct ipc_struct APP_ipc_tab_heap[HEAP_MAX] __attribute__((aligned(4096))) = {
+ };
+ int APP_ipc_tab_heap_nr = HEAP_MAX;
+ 
+ 
+ void app_ipc_remove_heap(void *begin) {
++//	uk_pr_crit("REMOVE %p  \n", begin);
+ 	for(int i = 0; i < HEAP_MAX; i++) {
+ 		if(APP_ipc_tab_heap[i].begin != begin)
+ 			continue;
+@@ -48,12 +51,12 @@
+ 		return;
+ 	}
+ 
+-	uk_pr_crit("Entry with begin %p doesn exist\n", begin);
+-	while(1);
++//	uk_pr_crit("Entry with begin %p doesn exist\n", begin);
++//	while(1);
+ }
+ 
+ void app_ipc_add_heap(void *begin, size_t size, int mask) {
+-	uk_pr_crit("Add %p %x %x \n", begin, size, mask);
++//	uk_pr_crit("Add %p %x %x \n", begin, size, mask);
+ 	for(int i = 0; i < HEAP_MAX; i++) {
+ 		if(APP_ipc_tab_heap[i].size != 0)
+ 			continue;
+diff -uarN sqlite-amalgamation-3300100_old/sqlite3.c sqlite-amalgamation-3300100/sqlite3.c
+--- sqlite-amalgamation-3300100_old/sqlite3.c	2020-07-15 00:07:57.188000000 +0300
++++ sqlite-amalgamation-3300100/sqlite3.c	2020-07-15 15:11:45.140000000 +0300
+@@ -1,9 +1,41 @@
++#include "ipc.h"
++
+ void *dl2malloc(int size);
+ void *dl2calloc(int nmemb, int size);
+ void dl2free(void *ptr);
+ void *dl2realloc(void *ptr, int size);
+ 
+-#include "ipc.h"
++int ctr = 0;
++
++void *dl3malloc(int size) {
++	void *ret;
++	dl2posix_memalign(&ret, 4096, size);
++//	printf("MALLOC: %p -- %p, +%x, %d\n", ret, ret+size, size, size == 0x1008 ? ctr++: 0);
++
++	return ret;
++}
++
++//sqlite doesn't use calloc at all
++void *dl3calloc(int nmemb, int size) {
++	void *ret = dl2calloc(nmemb, size);
++	return ret;
++}
++
++void dl3free(void *ptr) {
++//	printf("FREE %p\n", ptr);
++	if(ptr)
++		app_ipc_remove_heap(ptr);
++	dl2free(ptr);
++}
++
++//sqlite doesn't us realloc memory in IPC
++void *dl3realloc(void *ptr, int size) {
++	void *ret = dl2realloc(ptr, ((size>>12)+1) << 12);
++	return ret;
++}
++
++
++
+ 
+ /****************
+ **************************************************************
+@@ -22996,9 +23028,9 @@
+ ** Use standard C library malloc and free on non-Apple systems.  
+ ** Also used by Apple systems if SQLITE_WITHOUT_ZONEMALLOC is defined.
+ */
+-#define SQLITE_MALLOC(x)             dl2malloc(x)
+-#define SQLITE_FREE(x)               dl2free(x)
+-#define SQLITE_REALLOC(x,y)          dl2realloc((x),(y))
++#define SQLITE_MALLOC(x)             dl3malloc(x)
++#define SQLITE_FREE(x)               dl3free(x)
++#define SQLITE_REALLOC(x,y)          dl3realloc((x),(y))
+ 
+ /*
+ ** The malloc.h header file is needed for malloc_usable_size() function
+@@ -39166,6 +39198,7 @@
+     /* Call stat() on path zIn. Set bLink to true if the path is a symbolic
+     ** link, or false otherwise.  */
+     int bLink = 0;
++//TODO_FEMTO
+     struct stat buf;
+     if( osLstat(zIn, &buf)!=0 ){
+       if( errno!=ENOENT ){
+@@ -49313,6 +49346,7 @@
+   }
+   zBulk = pCache->pBulk = sqlite3Malloc( szBulk );
+   sqlite3EndBenignMalloc();
++    app_ipc_add_heap(zBulk, szBulk, (1 << 0) | ( 1 << 21));
+   if( zBulk ){
+     int nBulk = sqlite3MallocSize(zBulk)/pCache->szAlloc;
+     do{
+@@ -49470,6 +49504,7 @@
+     p->isAnchor = 0;
+   }
+   (*pCache->pnPurgeable)++;
++    app_ipc_add_heap(pPg, pCache->szAlloc, (1 << 21) | ( 1 << 0));
+   return p;
+ }
+ 
+@@ -54741,6 +54776,7 @@
+       if( !pNew ){
+         rc = SQLITE_NOMEM_BKPT;
+       }else{
++	app_ipc_add_heap(pNew, pageSize+8, (1 << 0) | (1 << 21));
+         memset(pNew+pageSize, 0, 8);
+       }
+     }
+@@ -55738,6 +55774,8 @@
+     if( zPathname==0 ){
+       return SQLITE_NOMEM_BKPT;
+     }
++
++	app_ipc_add_heap(zPathname, 1024, (1 << 21) | (1 << 0));
+     zPathname[0] = 0; /* Make sure initialized even if FullPathname() fails */
+     rc = sqlite3OsFullPathname(pVfs, zFilename, nPathname, zPathname);
+     nPathname = sqlite3Strlen30(zPathname);
+@@ -55797,6 +55835,8 @@
+   pPager->sjfd = (sqlite3_file*)(pPtr += ROUND8(pVfs->szOsFile));
+   pPager->jfd =  (sqlite3_file*)(pPtr += journalFileSize);
+   pPager->zFilename =    (char*)(pPtr += journalFileSize);
++//todo: split pPager into separate aligned blocks and add zFilename and zJournal
++    app_ipc_add_heap(pPtr, 0x2b8, (1 << 0) | (1 << 21));
+   assert( EIGHT_BYTE_ALIGNMENT(pPager->jfd) );
+ 
+   /* Fill in the Pager.zFilename and Pager.zJournal buffers, if required. */
+@@ -55808,7 +55848,7 @@
+     memcpy(pPager->zJournal, zPathname, nPathname);
+     memcpy(&pPager->zJournal[nPathname], "-journal\000", 8+2);
+ //FEMTO
+-    app_ipc_add_heap(pPager->zJournal, nPathname+8+2, (1 << 0) || (1 << 21));
++//    app_ipc_add_heap(pPager->zJournal, nPathname+8+2, (1 << 0) || (1 << 21));
+ //
+     sqlite3FileSuffix3(pPager->zFilename, pPager->zJournal);
+ #ifndef SQLITE_OMIT_WAL
+@@ -66221,6 +66261,7 @@
+   if( !pBt->pTmpSpace ){
+     pBt->pTmpSpace = sqlite3PageMalloc( pBt->pageSize );
+ 
++
+     /* One of the uses of pBt->pTmpSpace is to format cells before
+     ** inserting them into a leaf page (function fillInCell()). If
+     ** a cell is less than 4 bytes in size, it is rounded up to 4 bytes
+@@ -66237,6 +66278,10 @@
+     ** left-child pointer to the beginning of a cell.
+     */
+     if( pBt->pTmpSpace ){
++//FEMTO
++	app_ipc_add_heap(pBt->pTmpSpace, pBt->pageSize, (1 << 21) | ( 1 << 0));
++//1
++
+       memset(pBt->pTmpSpace, 0, 8);
+       pBt->pTmpSpace += 4;
+     }
+@@ -93095,6 +93140,7 @@
+     if( pReadr->aBuffer==0 ){
+       pReadr->aBuffer = (u8*)sqlite3Malloc(pgsz);
+       if( pReadr->aBuffer==0 ) rc = SQLITE_NOMEM_BKPT;
++	app_ipc_add_heap(pReadr->aBuffer, pgsz, (1 << 21) | (1 << 0));
+       pReadr->nBuffer = pgsz;
+     }
+     if( rc==SQLITE_OK && iBuf ){
+@@ -159585,6 +159631,7 @@
+     rc = SQLITE_MISUSE_BKPT;  /* IMP: R-65497-44594 */
+   }else{
+     rc = sqlite3ParseUri(zVfs, zFilename, &flags, &db->pVfs, &zOpen, &zErrMsg);
++    app_ipc_add_heap(zOpen, 1024, (1 << 0) | ( 1 << 21));
+   }
+   if( rc!=SQLITE_OK ){
+     if( rc==SQLITE_NOMEM ) sqlite3OomFault(db);
+@@ -159749,6 +159796,8 @@
+ #if defined(SQLITE_HAS_CODEC)
+   if( rc==SQLITE_OK ) sqlite3CodecQueryParameters(db, 0, zOpen);
+ #endif
++
++	app_ipc_remove_heap(zOpen);
+   sqlite3_free(zOpen);
+   return rc & 0xff;
+ }

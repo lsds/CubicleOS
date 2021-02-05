@@ -1,0 +1,10 @@
+--- /dev/null	2020-03-20 13:22:49.412000000 +0300
++++ sqlite-amalgamation-3300100/dlmemreq.h	2020-06-30 14:24:23.812000000 +0300
+@@ -0,0 +1,7 @@
++#ifndef MEMREQ_H
++#define MEMREQ_H
++
++char* u_get_memory(unsigned num_bytes);
++
++#endif /*MEMREQ_H*/
++

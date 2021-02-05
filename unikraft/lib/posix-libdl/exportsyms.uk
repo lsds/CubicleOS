@@ -1,0 +1,6 @@
+dlopen2
+dlclose2
+dlsym2
+dlerror2
+dladdr2
+dlinfo2

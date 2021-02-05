@@ -1,0 +1,121 @@
+#  SPDX-License-Identifier: BSD-3-Clause
+#
+#  gcc Makefile.uk
+#
+#  Authors: Charalampos Mainas <charalampos.mainas@neclab.eu>
+#           Costin Lupu <costin.lupu@cs.pub.ro>
+#
+#  Copyright (c) 2019, NEC Europe Ltd., NEC Corporation
+#                2019, University Politehnica of Bucharest
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its
+#     contributors may be used to endorse or promote products derived from
+#     this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+#  THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
+#
+
+################################################################################
+# Library registration
+################################################################################
+$(eval $(call addlib_s,libgcc,$(CONFIG_LIBGCC)))
+$(eval $(call addlib_s,libbacktrace,$(CONFIG_LIBBACKTRACE)))
+$(eval $(call addlib_s,libffi,$(CONFIG_LIBFFI)))
+
+################################################################################
+# Original sources
+################################################################################
+LIBGCC_VERSION=7.3.0
+LIBGCC_URL=https://ftp.gnu.org/gnu/gcc/gcc-$(LIBGCC_VERSION)/gcc-$(LIBGCC_VERSION).tar.gz
+LIBGCC_SUBDIR=gcc-$(LIBGCC_VERSION)
+$(eval $(call fetch,libgcc,$(LIBGCC_URL)))
+
+################################################################################
+# Helpers
+################################################################################
+LIBGCC_EXTRACTED = $(LIBGCC_ORIGIN)/gcc-$(LIBGCC_VERSION)
+LIBBACKTRACE_EXTRACTED = $(LIBGCC_EXTRACTED)/libbacktrace
+LIBFFI_EXTRACTED = $(LIBGCC_EXTRACTED)/libffi
+
+################################################################################
+# Library includes
+################################################################################
+CINCLUDES-$(CONFIG_LIBGCC)   += -I$(LIBGCC_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBGCC) += -I$(LIBGCC_BASE)/include
+
+CINCLUDES-$(CONFIG_LIBBACKTRACE)   += -I$(LIBGCC_BASE)/libbacktrace/include
+CXXINCLUDES-$(CONFIG_LIBBACKTRACE) += -I$(LIBGCC_BASE)/libbacktrace/include
+
+CINCLUDES-$(CONFIG_LIBFFI)   += -I$(LIBGCC_BASE)/libffi/include
+CXXINCLUDES-$(CONFIG_LIBFFI) += -I$(LIBGCC_BASE)/libffi/include
+
+################################################################################
+# libbacktrace code
+################################################################################
+LIBBACKTRACE_CINCLUDES-y = -I$(LIBGCC_BASE)/libbacktrace/include \
+	-I$(LIBGCC_EXTRACTED)/include -I$(LIBBACKTRACE_EXTRACTED) \
+	-I$(LIBGCC_BASE)/libbacktrace/include/config
+
+LIBBACKTRACE_CFLAGS-y += -DHAVE_CONFIG_H -DHAVE_STDINT_H\
+	-funwind-tables \
+	-W -Wall -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes \
+	-Wold-style-definition -Wmissing-format-attribute -Wcast-qual
+
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/atomic.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/dwarf.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/fileline.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/posix.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/print.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/sort.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/state.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/backtrace.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/simple.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/elf.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/mmapio.c
+LIBBACKTRACE_SRCS-y += $(LIBBACKTRACE_EXTRACTED)/mmap.c
+
+################################################################################
+# libffi code
+################################################################################
+LIBFFI_COMMON_CINCLUDES-y = -I$(LIBGCC_BASE)/libffi/include \
+       -I$(LIBGCC_EXTRACTED)/include -I$(LIBFFI_EXTRACTED)/include \
+       -I$(LIBGCC_BASE)/libffi/include/config
+LIBFFI_COMMON_CINCLUDES-$(CONFIG_ARCH_X86_64) += -I$(LIBFFI_EXTRACTED)/src/x86
+LIBFFI_ASINCLUDES-y = $(LIBFFI_COMMON_CINCLUDES-y)
+LIBFFI_CINCLUDES-y  = $(LIBFFI_COMMON_CINCLUDES-y)
+
+LIBFFI_CFLAGS-y += -DHAVE_CONFIG_H -fexceptions -Wall \
+	-Wno-implicit-function-declaration -Wno-sign-compare \
+	-Wno-unused-parameter -Wno-empty-body -Wno-implicit-fallthrough
+
+ifneq ($(CONFIG_LIBPYTHON3_EXTENSION_CTYPES),y)
+LIBFFI_SRCS-y += $(LIBFFI_EXTRACTED)/src/types.c
+LIBFFI_SRCS-y += $(LIBFFI_EXTRACTED)/src/closures.c
+endif
+LIBFFI_SRCS-y += $(LIBFFI_EXTRACTED)/src/java_raw_api.c
+LIBFFI_SRCS-y += $(LIBFFI_EXTRACTED)/src/prep_cif.c
+LIBFFI_SRCS-y += $(LIBFFI_EXTRACTED)/src/raw_api.c
+LIBFFI_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBFFI_EXTRACTED)/src/x86/ffi64.c
+LIBFFI_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBFFI_EXTRACTED)/src/x86/unix64.S
+

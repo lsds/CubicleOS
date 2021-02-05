@@ -1,0 +1,91 @@
+#  SPDX-License-Identifier: BSD-3-Clause
+#
+#  SQLite Makefile.uk
+#
+#  Authors: Gain Gaulthier <gaulthier.gain@uliege.be>
+#
+#  Copyright (c) 2019, University of Liege. All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its
+#     contributors may be used to endorse or promote products derived from
+#     this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+#  THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
+#
+
+################################################################################
+# App registration
+################################################################################
+$(eval $(call addlib,libsqlite))
+
+################################################################################
+# Sources
+################################################################################
+LIBSQLITE_VERSION = 3300100
+LIBSQLITE_BASENAME = sqlite-amalgamation-$(LIBSQLITE_VERSION)
+LIBSQLITE_URL = https://www.sqlite.org/2019/$(LIBSQLITE_BASENAME).zip
+LIBSQLITE_PATCHDIR = $(LIBSQLITE_BASE)/patches
+$(eval $(call fetch,libsqlite,$(LIBSQLITE_URL)))
+$(eval $(call patch,libsqlite,$(LIBSQLITE_PATCHDIR),$(LIBSQLITE_BASENAME)))
+
+################################################################################
+# Helpers
+################################################################################
+LIBSQLITE_SRC = $(LIBSQLITE_ORIGIN)/$(LIBSQLITE_BASENAME)
+
+################################################################################
+# Library includes
+################################################################################
+LIBSQLITE_CINCLUDES-y += -I$(LIBSQLITE_BASE)/include
+LIBSQLITE_CINCLUDES += -I$(LIBSQLITE_SRC)
+
+################################################################################
+# Global flags
+################################################################################
+LIBSQLITE_FLAGS = -D_HAVE_SQLITE_CONFIG_H -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_THREADSAFE=0 -O2
+#-DSQLITE_ENABLE_MEMSYS5
+
+# Suppress some warnings to make the build process look neater
+LIBSQLITE_SUPPRESS_FLAGS-y += -Wno-unused-parameter -Wno-unused-variable		\
+-Wno-cast-function-type -Wno-char-subscripts
+
+LIBSQLITE_SUPPRESS_FLAGS-$(call gcc_version_ge,7,0) +=-Wimplicit-fallthrough=0		\
+
+LIBSQLITE_CFLAGS-y += $(LIBSQLITE_FLAGS)
+LIBSQLITE_CFLAGS-y += $(LIBSQLITE_SUPPRESS_FLAGS-y)
+
+################################################################################
+# Glue code
+################################################################################
+LIBSQLITE_SRCS-$(CONFIG_LIBSQLITE_MAIN_FUNCTION) += $(LIBSQLITE_BASE)/main.c|unikraft
+
+################################################################################
+# SQLite sources
+################################################################################
+LIBSQLITE_SHELL_FLAGS-y += -Dmain=sqlite_main -Dwmain=sqlite_main
+
+#LIBSQLITE_SRCS-y += $(LIBSQLITE_SRC)/shell.c
+LIBSQLITE_SRCS-y += $(LIBSQLITE_SRC)/sqlite3.c 
+LIBSQLITE_SRCS-y += $(LIBSQLITE_SRC)/dlmalloc.c $(LIBSQLITE_SRC)/dlmemreq.c 
+LIBSQLITE_SRCS-y += $(LIBSQLITE_SRC)/ipc.c

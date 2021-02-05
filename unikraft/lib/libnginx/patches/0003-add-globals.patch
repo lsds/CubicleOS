@@ -1,0 +1,73 @@
+diff -uar nginx-1.15.6/src/event/modules/ngx_select_module.c nginx-1.15.6_new/src/event/modules/ngx_select_module.c
+--- a/src/event/modules/ngx_select_module.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/event/modules/ngx_select_module.c	2020-07-17 13:06:55.892000000 +0300
+@@ -24,8 +25,24 @@
+ 
+ static fd_set         master_read_fd_set;
+ static fd_set         master_write_fd_set;
++
++#ifdef LLVM
+ static fd_set         work_read_fd_set;
++#else
++static struct pad1_s {
++	fd_set         work_read_fd_set;
++	char pad[4096-sizeof(fd_set)];
++} __attribute__ ((aligned (4096))) pad1;
++#endif
++
++#ifdef LLVM
+ static fd_set         work_write_fd_set;
++#else
++static struct pad2_s {
++	fd_set         work_write_fd_set;
++	char pad[4096-sizeof(fd_set)];
++} __attribute__ ((aligned (4096))) pad2;
++#endif
+ 
+ static ngx_int_t      max_fd;
+ static ngx_uint_t     nevents;
+@@ -257,10 +274,21 @@
+     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                    "select timer: %M", timer);
+ 
++#ifdef LLVM
+     work_read_fd_set = master_read_fd_set;
+     work_write_fd_set = master_write_fd_set;
+ 
+     ready = select(max_fd + 1, &work_read_fd_set, &work_write_fd_set, NULL, tp);
++#else
++    pad1.work_read_fd_set = master_read_fd_set;
++    pad2.work_write_fd_set = master_write_fd_set;
++    extern void app_ipc_add_global(int i, void *begin, size_t size, int mask);
++    app_ipc_add_global(1, &pad1.work_read_fd_set, sizeof(fd_set), (1 << 0) | (1 << 17) );
++    app_ipc_add_global(2, &pad2.work_write_fd_set, sizeof(fd_set), (1 << 0) | (1 << 17) );
++    ready = select(max_fd + 1, &pad1.work_read_fd_set, &pad2.work_write_fd_set, NULL, tp);
++#endif
++
++
+ 
+     err = (ready == -1) ? ngx_errno : 0;
+ 
+@@ -314,14 +342,22 @@
+         found = 0;
+ 
+         if (ev->write) {
++#ifdef LLVM
+             if (FD_ISSET(c->fd, &work_write_fd_set)) {
++#else
++            if (FD_ISSET(c->fd, &pad2.work_write_fd_set)) {
++#endif
+                 found = 1;
+                 ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                                "select write %d", c->fd);
+             }
+ 
+         } else {
++#ifdef LLVM
+             if (FD_ISSET(c->fd, &work_read_fd_set)) {
++#else
++            if (FD_ISSET(c->fd, &pad1.work_read_fd_set)) {
++#endif
+                 found = 1;
+                 ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                                "select read %d", c->fd);

@@ -1,0 +1,873 @@
+diff -uar a/src/core/ngx_conf_file.c b/src/core/ngx_conf_file.c
+--- a/src/core/ngx_conf_file.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/core/ngx_conf_file.c	2020-07-18 14:18:01.948000000 +0300
+@@ -161,7 +161,16 @@
+     ngx_fd_t          fd;
+     ngx_int_t         rc;
+     ngx_buf_t         buf;
+-    ngx_conf_file_t  *prev, conf_file;
++    ngx_conf_file_t  *prev;
++#ifdef LLVM
++    ngx_conf_file_t  conf_file;
++#else
++	struct pad_s {
++		ngx_conf_file_t  conf_file;
++		char pad[4096-sizeof(ngx_conf_file_t)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(10, &pad.conf_file, sizeof(ngx_conf_file_t), (1 << 21) | ( 1 << 0));
++#endif
+     enum {
+         parse_file = 0,
+         parse_block,
+@@ -187,9 +196,11 @@
+         }
+ 
+         prev = cf->conf_file;
+-
++#ifdef LLVM
+         cf->conf_file = &conf_file;
+-
++#else
++        cf->conf_file = &pad.conf_file;
++#endif
+         if (ngx_fd_info(fd, &cf->conf_file->file.info) == NGX_FILE_ERROR) {
+             ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                           ngx_fd_info_n " \"%s\" failed", filename->data);
+@@ -198,10 +209,17 @@
+         cf->conf_file->buffer = &buf;
+ 
+         buf.start = ngx_alloc(NGX_CONF_BUFFER, cf->log);
++
+         if (buf.start == NULL) {
+             goto failed;
+         }
+ 
++//
++	printf("BUF.START = %p\n", buf.start);
++	extern void app_ipc_add_heap(void *, size_t, int);
++	app_ipc_add_heap(buf.start, NGX_CONF_BUFFER, (1 << 0 ) | (1 << 21));
++//
++
+         buf.pos = buf.start;
+         buf.last = buf.start;
+         buf.end = buf.last + NGX_CONF_BUFFER;
+@@ -332,6 +350,9 @@
+     if (filename) {
+         if (cf->conf_file->buffer->start) {
+             ngx_free(cf->conf_file->buffer->start);
++	app_ipc_remove_heap(cf->conf_file->buffer->start);
++//
++
+         }
+ 
+         if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+diff -uar a/src/core/ngx_connection.c b/src/core/ngx_connection.c
+--- a/src/core/ngx_connection.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/core/ngx_connection.c	2020-07-18 14:49:49.892000000 +0300
+@@ -406,14 +406,26 @@
+ ngx_int_t
+ ngx_open_listening_sockets(ngx_cycle_t *cycle)
+ {
++#ifdef LLVM
+     int               reuseaddr;
++#else
++	struct pad_s {
++    int               reuseaddr;
++		char pad[4096-sizeof(int)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(12, &pad.reuseaddr, sizeof(int), (1 << 17) | ( 1 << 0));
++#endif
+     ngx_uint_t        i, tries, failed;
+     ngx_err_t         err;
+     ngx_log_t        *log;
+     ngx_socket_t      s;
+     ngx_listening_t  *ls;
+ 
++#ifdef LLVM
+     reuseaddr = 1;
++#else
++    pad.reuseaddr = 1;
++#endif
+ #if (NGX_SUPPRESS_WARN)
+     failed = 0;
+ #endif
+@@ -496,7 +508,11 @@
+             }
+ 
+             if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
++#ifdef LLVM
+                            (const void *) &reuseaddr, sizeof(int))
++#else
++                           (const void *) &pad.reuseaddr, sizeof(int))
++#endif
+                 == -1)
+             {
+                 ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+@@ -598,6 +614,11 @@
+             ngx_log_debug2(NGX_LOG_DEBUG_CORE, log, 0,
+                            "bind() %V #%d ", &ls[i].addr_text, s);
+ 
++//
++	extern void app_ipc_add_heap(void *, size_t, int);
++	app_ipc_add_heap(ls[i].sockaddr, 4096, (1 << 0 ) | (1 << 17));
++//
++
+             if (bind(s, ls[i].sockaddr, ls[i].socklen) == -1) {
+                 err = ngx_socket_errno;
+ 
+@@ -622,7 +643,7 @@
+ 
+                 continue;
+             }
+-
++	app_ipc_remove_heap(ls[i].sockaddr);
+ #if (NGX_HAVE_UNIX_DOMAIN)
+ 
+             if (ls[i].sockaddr->sa_family == AF_UNIX) {
+@@ -1411,19 +1432,35 @@
+ ngx_int_t
+ ngx_tcp_nodelay(ngx_connection_t *c)
+ {
++#ifdef LLVM
+     int  tcp_nodelay;
++#else
++	struct pad_s {
++		int  tcp_nodelay;
++		char pad[4096-sizeof(int)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(17, &pad.tcp_nodelay, sizeof(int), (1 << 17) | ( 1 << 0));
++#endif
+ 
+     if (c->tcp_nodelay != NGX_TCP_NODELAY_UNSET) {
+         return NGX_OK;
+     }
+ 
+     ngx_log_debug0(NGX_LOG_DEBUG_CORE, c->log, 0, "tcp_nodelay");
+-
++#ifdef LLVM
+     tcp_nodelay = 1;
+-
++#else
++    pad.tcp_nodelay = 1;
++#endif
++#ifdef LLVM
+     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
+                    (const void *) &tcp_nodelay, sizeof(int))
+         == -1)
++#else
++    if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
++                   (const void *) &pad.tcp_nodelay, sizeof(int))
++        == -1)
++#endif
+     {
+ #if (NGX_SOLARIS)
+         if (c->log_error == NGX_ERROR_INFO) {
+diff -uar a/src/core/ngx_cycle.c b/src/core/ngx_cycle.c
+--- a/src/core/ngx_cycle.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/core/ngx_cycle.c	2020-07-18 13:16:25.952000000 +0300
+@@ -52,7 +52,15 @@
+     ngx_listening_t     *ls, *nls;
+     ngx_core_conf_t     *ccf, *old_ccf;
+     ngx_core_module_t   *module;
++#ifdef LLVM
+     char                 hostname[NGX_MAXHOSTNAMELEN];
++#else
++	struct pad_s {
++		char                 hostname[NGX_MAXHOSTNAMELEN];
++		char pad[4096-NGX_MAXHOSTNAMELEN];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(9, &pad.hostname, NGX_MAXHOSTNAMELEN, (1 << 3) | ( 1 << 0));
++#endif
+ 
+     ngx_timezone_update();
+ 
+@@ -102,6 +110,11 @@
+         ngx_destroy_pool(pool);
+         return NULL;
+     }
++//
++	extern void app_ipc_add_heap(void *, size_t, int);
++	app_ipc_add_heap(cycle->conf_file.data, old_cycle->conf_file.len + 1, (1 << 0 ) | (1 << 21));
++//
++
+     ngx_cpystrn(cycle->conf_file.data, old_cycle->conf_file.data,
+                 old_cycle->conf_file.len + 1);
+ 
+@@ -192,25 +205,31 @@
+         return NULL;
+     }
+ 
+-
++#ifdef LLVM
+     if (gethostname(hostname, NGX_MAXHOSTNAMELEN) == -1) {
++#else
++    if (gethostname(pad.hostname, NGX_MAXHOSTNAMELEN) == -1) {
++#endif
+         ngx_log_error(NGX_LOG_EMERG, log, ngx_errno, "gethostname() failed");
+         ngx_destroy_pool(pool);
+         return NULL;
+     }
+ 
+     /* on Linux gethostname() silently truncates name that does not fit */
+-
++#ifdef LLVM
+     hostname[NGX_MAXHOSTNAMELEN - 1] = '\0';
+     cycle->hostname.len = ngx_strlen(hostname);
+-
++#else
++    pad.hostname[NGX_MAXHOSTNAMELEN - 1] = '\0';
++    cycle->hostname.len = ngx_strlen(pad.hostname);
++#endif
+     cycle->hostname.data = ngx_pnalloc(pool, cycle->hostname.len);
+     if (cycle->hostname.data == NULL) {
+         ngx_destroy_pool(pool);
+         return NULL;
+     }
+ 
+-    ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len);
++    ngx_strlow(cycle->hostname.data, (u_char *) pad.hostname, cycle->hostname.len);
+ 
+ 
+     if (ngx_cycle_modules(cycle) != NGX_OK) {
+@@ -947,7 +966,15 @@
+     size_t      len;
+     ngx_uint_t  create;
+     ngx_file_t  file;
++#ifdef LLVM
+     u_char      pid[NGX_INT64_LEN + 2];
++#else
++	struct pad_s {
++		u_char      pid[NGX_INT64_LEN + 2];
++		char pad[4096-NGX_INT64_LEN - 2];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(13, &pad.pid, NGX_INT64_LEN + 2, (1 << 17) | ( 1 << 0));
++#endif
+ 
+     if (ngx_process > NGX_PROCESS_MASTER) {
+         return NGX_OK;
+@@ -970,9 +997,17 @@
+     }
+ 
+     if (!ngx_test_config) {
++#ifdef LLVM
+         len = ngx_snprintf(pid, NGX_INT64_LEN + 2, "%P%N", ngx_pid) - pid;
++#else
++        len = ngx_snprintf(pad.pid, NGX_INT64_LEN + 2, "%P%N", ngx_pid) - pad.pid;
++#endif
+ 
++#ifdef LLVM
+         if (ngx_write_file(&file, pid, len, 0) == NGX_ERROR) {
++#else
++        if (ngx_write_file(&file, pad.pid, len, 0) == NGX_ERROR) {
++#endif
+             return NGX_ERROR;
+         }
+     }
+diff -uar a/src/core/ngx_file.c b/src/core/ngx_file.c
+--- a/src/core/ngx_file.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/core/ngx_file.c	2020-07-18 14:29:22.024000000 +0300
+@@ -44,6 +44,10 @@
+     if (n == NULL) {
+         return NGX_ERROR;
+     }
++//
++	extern void app_ipc_add_heap(void *, size_t, int);
++	app_ipc_add_heap(n, len + name->len + 1, (1 << 0 ) | (1 << 21));
++//
+ 
+     p = ngx_cpymem(n, prefix->data, len);
+     ngx_cpystrn(p, name->data, name->len + 1);
+@@ -620,15 +624,30 @@
+ 
+ #if !(NGX_WIN32)
+         {
++#ifdef LLVM
+         ngx_file_info_t   fi;
++#else
++	struct pad_s {
++		ngx_file_info_t   fi;
++		char pad[4096-sizeof(ngx_file_info_t)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(11, &pad.fi, sizeof(ngx_file_info_t), (1 << 21) | ( 1 << 0));
++#endif
+ 
++#ifdef LLVM
+         if (ngx_file_info(path[i]->name.data, &fi) == NGX_FILE_ERROR) {
++#else
++        if (ngx_file_info(path[i]->name.data, &pad.fi) == NGX_FILE_ERROR) {
++#endif
+             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                           ngx_file_info_n " \"%s\" failed", path[i]->name.data);
+             return NGX_ERROR;
+         }
+-
++#ifdef LLVM
+         if (fi.st_uid != user) {
++#else
++        if (pad.fi.st_uid != user) {
++#endif
+             if (chown((const char *) path[i]->name.data, user, -1) == -1) {
+                 ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                               "chown(\"%s\", %d) failed",
+@@ -637,6 +656,7 @@
+             }
+         }
+ 
++#ifdef LLVM
+         if ((fi.st_mode & (S_IRUSR|S_IWUSR|S_IXUSR))
+                                                   != (S_IRUSR|S_IWUSR|S_IXUSR))
+         {
+@@ -648,6 +668,20 @@
+                 return NGX_ERROR;
+             }
+         }
++#else
++        if ((pad.fi.st_mode & (S_IRUSR|S_IWUSR|S_IXUSR))
++                                                  != (S_IRUSR|S_IWUSR|S_IXUSR))
++        {
++            pad.fi.st_mode |= (S_IRUSR|S_IWUSR|S_IXUSR);
++
++            if (chmod((const char *) path[i]->name.data, pad.fi.st_mode) == -1) {
++                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
++                              "chmod() \"%s\" failed", path[i]->name.data);
++                return NGX_ERROR;
++            }
++        }
++
++#endif
+         }
+ #endif
+     }
+diff -uar a/src/core/ngx_log.c b/src/core/ngx_log.c
+--- a/src/core/ngx_log.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/core/ngx_log.c	2020-07-18 12:43:43.336000000 +0300
+@@ -359,6 +359,11 @@
+ 
+         if (plen) {
+             name = malloc(plen + nlen + 2);
++//
++	extern void app_ipc_add_heap(void *, size_t, int);
++	app_ipc_add_heap(name, plen+nlen+2, (1 << 0 ) | (1 << 21));
++//
++
+             if (name == NULL) {
+                 return NULL;
+             }
+@@ -394,6 +399,7 @@
+ 
+     if (p) {
+         ngx_free(p);
++	app_ipc_remove_heap(name);
+     }
+ 
+     return &ngx_log;
+diff -uar a/src/core/ngx_open_file_cache.c b/src/core/ngx_open_file_cache.c
+--- a/src/core/ngx_open_file_cache.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/core/ngx_open_file_cache.c	2020-07-18 15:21:15.288000000 +0300
+@@ -635,7 +635,9 @@
+     ngx_str_t         at_name;
+ 
+     if (of->disable_symlinks == NGX_DISABLE_SYMLINKS_OFF) {
++	app_ipc_add_heap(name->data, name->len, (1 << 0 ) | (1 << 21));
+         fd = ngx_open_file(name->data, mode, create, access);
++	app_ipc_remove_heap(name->data);
+ 
+         if (fd == NGX_INVALID_FILE) {
+             of->err = ngx_errno;
+@@ -841,27 +843,48 @@
+     ngx_log_t *log)
+ {
+     ngx_fd_t         fd;
++#ifdef LLVM
+     ngx_file_info_t  fi;
++#else
++	struct pad_s {
++		ngx_file_info_t  fi;
++		char pad[4096-sizeof(ngx_file_info_t)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(16, &pad.fi, sizeof(long), (1 << 21) | ( 1 << 0));
++#endif
+ 
+     if (of->fd != NGX_INVALID_FILE) {
+-
++#ifdef LLVM
+         if (ngx_file_info_wrapper(name, of, &fi, log) == NGX_FILE_ERROR) {
++#else
++        if (ngx_file_info_wrapper(name, of, &pad.fi, log) == NGX_FILE_ERROR) {
++#endif
+             of->fd = NGX_INVALID_FILE;
+             return NGX_ERROR;
+         }
+-
++#ifdef LLVM
+         if (of->uniq == ngx_file_uniq(&fi)) {
++#else
++        if (of->uniq == ngx_file_uniq(&pad.fi)) {
++#endif
+             goto done;
+         }
+ 
+     } else if (of->test_dir) {
+-
++#ifdef LLVM
+         if (ngx_file_info_wrapper(name, of, &fi, log) == NGX_FILE_ERROR) {
++#else
++        if (ngx_file_info_wrapper(name, of, &pad.fi, log) == NGX_FILE_ERROR) {
++#endif
+             of->fd = NGX_INVALID_FILE;
+             return NGX_ERROR;
+         }
+ 
++#ifdef LLVM
+         if (ngx_is_dir(&fi)) {
++#else
++        if (ngx_is_dir(&pad.fi)) {
++#endif
+             goto done;
+         }
+     }
+@@ -886,8 +909,11 @@
+         of->fd = NGX_INVALID_FILE;
+         return NGX_ERROR;
+     }
+-
++#ifdef LLVM
+     if (ngx_fd_info(fd, &fi) == NGX_FILE_ERROR) {
++#else
++    if (ngx_fd_info(fd, &pad.fi) == NGX_FILE_ERROR) {
++#endif
+         ngx_log_error(NGX_LOG_CRIT, log, ngx_errno,
+                       ngx_fd_info_n " \"%V\" failed", name);
+ 
+@@ -900,8 +926,11 @@
+ 
+         return NGX_ERROR;
+     }
+-
++#ifdef LLVM
+     if (ngx_is_dir(&fi)) {
++#else
++    if (ngx_is_dir(&pad.fi)) {
++#endif
+         if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+             ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                           ngx_close_file_n " \"%V\" failed", name);
+@@ -911,15 +940,21 @@
+ 
+     } else {
+         of->fd = fd;
+-
++#ifdef LLVM
+         if (of->read_ahead && ngx_file_size(&fi) > NGX_MIN_READ_AHEAD) {
++#else
++        if (of->read_ahead && ngx_file_size(&pad.fi) > NGX_MIN_READ_AHEAD) {
++#endif
+             if (ngx_read_ahead(fd, of->read_ahead) == NGX_ERROR) {
+                 ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                               ngx_read_ahead_n " \"%V\" failed", name);
+             }
+         }
+-
++#ifdef LLVM
+         if (of->directio <= ngx_file_size(&fi)) {
++#else
++        if (of->directio <= ngx_file_size(&pad.fi)) {
++#endif
+             if (ngx_directio_on(fd) == NGX_FILE_ERROR) {
+                 ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                               ngx_directio_on_n " \"%V\" failed", name);
+@@ -931,7 +966,7 @@
+     }
+ 
+ done:
+-
++#ifdef LLVM
+     of->uniq = ngx_file_uniq(&fi);
+     of->mtime = ngx_file_mtime(&fi);
+     of->size = ngx_file_size(&fi);
+@@ -940,7 +975,16 @@
+     of->is_file = ngx_is_file(&fi);
+     of->is_link = ngx_is_link(&fi);
+     of->is_exec = ngx_is_exec(&fi);
+-
++#else
++    of->uniq = ngx_file_uniq(&pad.fi);
++    of->mtime = ngx_file_mtime(&pad.fi);
++    of->size = ngx_file_size(&pad.fi);
++    of->fs_size = ngx_file_fs_size(&pad.fi);
++    of->is_dir = ngx_is_dir(&pad.fi);
++    of->is_file = ngx_is_file(&pad.fi);
++    of->is_link = ngx_is_link(&pad.fi);
++    of->is_exec = ngx_is_exec(&pad.fi);
++#endif
+     return NGX_OK;
+ }
+ 
+diff -uar a/src/core/ngx_times.c b/src/core/ngx_times.c
+--- a/src/core/ngx_times.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/core/ngx_times.c	2020-07-17 15:04:34.248000000 +0300
+@@ -85,17 +85,31 @@
+     time_t           sec;
+     ngx_uint_t       msec;
+     ngx_time_t      *tp;
++#ifdef LLVM
+     struct timeval   tv;
++#else
++    struct pad_s {
++	struct timeval   tv;
++	char pad[4096-sizeof(struct timeval)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(6, &pad.tv, sizeof(struct timeval), (1 << 16) | ( 1 << 0));
++#endif
+ 
+     if (!ngx_trylock(&ngx_time_lock)) {
+         return;
+     }
+-
++#ifdef LLVM
+     ngx_gettimeofday(&tv);
+ 
+     sec = tv.tv_sec;
+     msec = tv.tv_usec / 1000;
++#else
++    ngx_gettimeofday(&pad.tv);
++
++    sec = pad.tv.tv_sec;
++    msec = pad.tv.tv_usec / 1000;
+ 
++#endif
+     ngx_current_msec = ngx_monotonic_time(sec, msec);
+ 
+     tp = &cached_time[slot];
+diff -uar a/src/event/modules/ngx_select_module.c b/src/event/modules/ngx_select_module.c
+--- a/src/event/modules/ngx_select_module.c	2020-07-18 16:40:46.020000000 +0300
++++ b/src/event/modules/ngx_select_module.c	2020-07-17 20:45:58.120000000 +0300
+@@ -232,7 +232,18 @@
+     ngx_uint_t         i, found;
+     ngx_event_t       *ev;
+     ngx_queue_t       *queue;
+-    struct timeval     tv, *tp;
++
++#ifdef LLVM
++    struct timeval     tv;
++#else
++	struct pad_s {
++		struct timeval     tv;
++		char pad[4096-sizeof(struct timeval)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(18, &pad.tv, sizeof(struct timeval), (1 << 17) | ( 1 << 0));
++#endif
++
++    struct timeval     *tp;
+     ngx_connection_t  *c;
+ 
+     if (max_fd == -1) {
+@@ -265,9 +276,15 @@
+         tp = NULL;
+ 
+     } else {
++#ifdef LLVM
+         tv.tv_sec = (long) (timer / 1000);
+         tv.tv_usec = (long) ((timer % 1000) * 1000);
+         tp = &tv;
++#else
++        pad.tv.tv_sec = (long) (timer / 1000);
++        pad.tv.tv_usec = (long) ((timer % 1000) * 1000);
++        tp = &pad.tv;
++#endif
+     }
+ 
+     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+diff -uar a/src/event/ngx_event_accept.c b/src/event/ngx_event_accept.c
+--- a/src/event/ngx_event_accept.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/event/ngx_event_accept.c	2020-07-17 18:11:10.568000000 +0300
+@@ -17,13 +17,22 @@
+ void
+ ngx_event_accept(ngx_event_t *ev)
+ {
++#ifdef LLVM
+     socklen_t          socklen;
++    ngx_sockaddr_t     sa;
++#else
++	struct pad_s {
++		socklen_t          socklen;
++		ngx_sockaddr_t     sa;
++		char pad[4096-sizeof(socklen_t) - (sizeof(ngx_sockaddr_t))];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(15, &pad.socklen, sizeof(long), (1 << 17) | ( 1 << 0));
++#endif
+     ngx_err_t          err;
+     ngx_log_t         *log;
+     ngx_uint_t         level;
+     ngx_socket_t       s;
+     ngx_event_t       *rev, *wev;
+-    ngx_sockaddr_t     sa;
+     ngx_listening_t   *ls;
+     ngx_connection_t  *c, *lc;
+     ngx_event_conf_t  *ecf;
+@@ -53,7 +62,11 @@
+                    "accept on %V, ready: %d", &ls->addr_text, ev->available);
+ 
+     do {
++#ifdef LLVM
+         socklen = sizeof(ngx_sockaddr_t);
++#else
++        pad.socklen = sizeof(ngx_sockaddr_t);
++#endif
+ 
+ #if (NGX_HAVE_ACCEPT4)
+         if (use_accept4) {
+@@ -62,7 +75,11 @@
+             s = accept(lc->fd, &sa.sockaddr, &socklen);
+         }
+ #else
++#ifdef LLVM
+         s = accept(lc->fd, &sa.sockaddr, &socklen);
++#else
++        s = accept(lc->fd, &pad.sa.sockaddr, &pad.socklen);
++#endif
+ #endif
+ 
+         if (s == (ngx_socket_t) -1) {
+@@ -159,17 +176,31 @@
+             return;
+         }
+ 
++#ifdef LLVM
+         if (socklen > (socklen_t) sizeof(ngx_sockaddr_t)) {
+             socklen = sizeof(ngx_sockaddr_t);
+         }
++#else
++        if (pad.socklen > (socklen_t) sizeof(ngx_sockaddr_t)) {
++            pad.socklen = sizeof(ngx_sockaddr_t);
++        }
++#endif
+ 
++#ifdef LLVM
+         c->sockaddr = ngx_palloc(c->pool, socklen);
++#else
++        c->sockaddr = ngx_palloc(c->pool, pad.socklen);
++#endif
+         if (c->sockaddr == NULL) {
+             ngx_close_accepted_connection(c);
+             return;
+         }
+ 
++#ifdef LLVM
+         ngx_memcpy(c->sockaddr, &sa, socklen);
++#else
++        ngx_memcpy(c->sockaddr, &pad.sa, pad.socklen);
++#endif
+ 
+         log = ngx_palloc(c->pool, sizeof(ngx_log_t));
+         if (log == NULL) {
+@@ -210,7 +241,11 @@
+         c->log = log;
+         c->pool->log = log;
+ 
++#ifdef LLVM
+         c->socklen = socklen;
++#else
++        c->socklen = pad.socklen;
++#endif
+         c->listening = ls;
+         c->local_sockaddr = ls->sockaddr;
+         c->local_socklen = ls->socklen;
+diff -uar a/src/http/modules/ngx_http_userid_filter_module.c b/src/http/modules/ngx_http_userid_filter_module.c
+--- a/src/http/modules/ngx_http_userid_filter_module.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/http/modules/ngx_http_userid_filter_module.c	2020-07-17 17:48:08.432000000 +0300
+@@ -835,12 +835,26 @@
+ static ngx_int_t
+ ngx_http_userid_init_worker(ngx_cycle_t *cycle)
+ {
++#ifdef LLVM
+     struct timeval  tp;
++#else
++	struct pad_s {
++		struct timeval  tp;
++		char pad[4096-sizeof(struct timeval)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(14, &pad.tp, sizeof(struct timeval), (1 << 16) | ( 1 << 0));
++#endif
+ 
++#ifdef LLVM
+     ngx_gettimeofday(&tp);
+-
++#else
++    ngx_gettimeofday(&pad.tp);
++#endif
+     /* use the most significant usec part that fits to 16 bits */
++#ifdef LLVM
+     start_value = (((uint32_t) tp.tv_usec / 20) << 16) | ngx_pid;
+-
++#else
++    start_value = (((uint32_t) pad.tp.tv_usec / 20) << 16) | ngx_pid;
++#endif
+     return NGX_OK;
+ }
+diff -uar a/src/http/ngx_http_request.c b/src/http/ngx_http_request.c
+--- a/src/http/ngx_http_request.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/http/ngx_http_request.c	2020-07-18 15:06:13.424000000 +0300
+@@ -424,9 +424,10 @@
+         b->last = b->start;
+         b->end = b->last + size;
+     }
+-
++//
++	app_ipc_add_heap(b->last, size, (1 << 0 ) | (1 << 17));
+     n = c->recv(c, b->last, size);
+-
++	app_ipc_remove_heap(b->last);
+     if (n == NGX_AGAIN) {
+ 
+         if (!rev->timer_set) {
+diff -uar a/src/os/unix/ngx_alloc.c b/src/os/unix/ngx_alloc.c
+--- a/src/os/unix/ngx_alloc.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/os/unix/ngx_alloc.c	2020-07-17 15:29:15.176000000 +0300
+@@ -51,21 +51,42 @@
+ void *
+ ngx_memalign(size_t alignment, size_t size, ngx_log_t *log)
+ {
+-    void  *p;
+     int    err;
+-
++#ifdef LLVM
++    void  *p;
++#else
++	struct pad_s {
++	void  *p;
++	char pad[4096-sizeof(long)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(7, &pad.p, sizeof(long), (1 << 6) | ( 1 << 0));
++#endif
++#ifdef LLVM
+     err = posix_memalign(&p, alignment, size);
+-
++#else
++    err = posix_memalign(&pad.p, alignment, size);
++#endif
+     if (err) {
+         ngx_log_error(NGX_LOG_EMERG, log, err,
+                       "posix_memalign(%uz, %uz) failed", alignment, size);
++#ifdef LLVM
+         p = NULL;
++#else
++	pad.p = NULL;
++#endif
+     }
+ 
++#ifdef LLVM
+     ngx_log_debug3(NGX_LOG_DEBUG_ALLOC, log, 0,
+                    "posix_memalign: %p:%uz @%uz", p, size, alignment);
+ 
+     return p;
++#else
++    ngx_log_debug3(NGX_LOG_DEBUG_ALLOC, log, 0,
++                   "posix_memalign: %p:%uz @%uz", pad.p, size, alignment);
++
++    return pad.p;
++#endif
+ }
+ 
+ #elif (NGX_HAVE_MEMALIGN)
+diff -uar a/src/os/unix/ngx_files.c b/src/os/unix/ngx_files.c
+--- a/src/os/unix/ngx_files.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/os/unix/ngx_files.c	2020-07-18 15:26:43.280000000 +0300
+@@ -36,8 +36,10 @@
+                    "read: %d, %p, %uz, %O", file->fd, buf, size, offset);
+ 
+ #if (NGX_HAVE_PREAD)
+-
++//
++	app_ipc_add_heap(buf, size, (1 << 0 ) | (1 << 21));
+     n = pread(file->fd, buf, size, offset);
++	app_ipc_remove_heap(buf);
+ 
+     if (n == -1) {
+         ngx_log_error(NGX_LOG_CRIT, file->log, ngx_errno,
+diff -uar a/src/os/unix/ngx_linux_init.c b/src/os/unix/ngx_linux_init.c
+--- a/src/os/unix/ngx_linux_init.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/os/unix/ngx_linux_init.c	2020-07-17 15:59:06.088000000 +0300
+@@ -33,17 +33,35 @@
+ ngx_int_t
+ ngx_os_specific_init(ngx_log_t *log)
+ {
++#ifdef LLVM
+     struct utsname  u;
+-
++#else
++	struct pad_s {
++		struct utsname  u;
++		char pad[4096-sizeof(struct utsname)];
++} __attribute__ ((aligned (4096))) pad;
++app_ipc_add_stack(8, &pad.u, sizeof(long), (1 << 3) | ( 1 << 0));
++#endif
++#ifdef LLVM
+     if (uname(&u) == -1) {
++#else
++    if (uname(&pad.u) == -1) {
++#endif
+         ngx_log_error(NGX_LOG_ALERT, log, ngx_errno, "uname() failed");
+         return NGX_ERROR;
+     }
+-
++#ifdef LLVM
+     (void) ngx_cpystrn(ngx_linux_kern_ostype, (u_char *) u.sysname,
++#else
++    (void) ngx_cpystrn(ngx_linux_kern_ostype, (u_char *) pad.u.sysname,
++#endif
+                        sizeof(ngx_linux_kern_ostype));
+ 
++#ifdef LLVM
+     (void) ngx_cpystrn(ngx_linux_kern_osrelease, (u_char *) u.release,
++#else
++    (void) ngx_cpystrn(ngx_linux_kern_osrelease, (u_char *) pad.u.release,
++#endif
+                        sizeof(ngx_linux_kern_osrelease));
+ 
+     ngx_os_io = ngx_linux_io;
+diff -uar a/src/os/unix/ngx_time.c b/src/os/unix/ngx_time.c
+--- a/src/os/unix/ngx_time.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/os/unix/ngx_time.c	2020-07-17 16:32:01.336000000 +0300
+@@ -39,12 +39,13 @@
+     tzset();
+ 
+ #elif (NGX_LINUX)
++return;
+     time_t      s;
++
+     struct tm  *t;
+     char        buf[4];
+ 
+     s = time(0);
+-
+     t = localtime(&s);
+ 
+     strftime(buf, 4, "%H", t);
+diff -uar a/src/os/unix/ngx_writev_chain.c b/src/os/unix/ngx_writev_chain.c
+--- a/src/os/unix/ngx_writev_chain.c	2018-11-06 16:32:09.000000000 +0300
++++ b/src/os/unix/ngx_writev_chain.c	2020-07-18 16:29:34.556000000 +0300
+@@ -186,8 +186,23 @@
+ 
+ eintr:
+ 
++	for(int i = 0; i < vec->count; i++) {
++		struct iovec *tmp = (struct iovec *) &(vec->iovs[i]);
++		//todo: iovec is heavily packet and within the same page some vectors and the structure itself
++		//I guess here should to different pointers, but I don't have time to investigate
++		if(tmp->iov_len != 0 )
++			app_ipc_add_heap(tmp->iov_base, tmp->iov_len, (1 << 0 ) | (1 << 17) | (1 << 21) );
++	}
++
+     n = writev(c->fd, vec->iovs, vec->count);
+ 
++	for(int i = 0; i < vec->count; i++) {
++		struct iovec *tmp = (struct iovec *) &(vec->iovs[i]);
++		if(tmp->iov_len != 0 )
++			app_ipc_remove_heap(tmp->iov_base);
++	}
++
++
+     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                    "writev: %z of %uz", n, vec->size);
+ 

@@ -1,0 +1,12 @@
+ukplat_entry_argp
+ukplat_entry
+main
+uk_version
+UKBOOT_ipc_tab_stack
+UKBOOT_ipc_tab_stack_nr
+UKBOOT_ipc_tab_globals
+UKBOOT_ipc_tab_globals_nr
+UKBOOT_ipc_tab_heap
+UKBOOT_ipc_tab_heap_nr
+ukboot_ipc_add_heap
+main_thread_func

@@ -1,0 +1,49 @@
+From 5b15a35b6bcc0cce17850a51ffad825a577bd219 Mon Sep 17 00:00:00 2001
+From: Vlad-Andrei Badoiu <vlad_andrei.badoiu@stud.acs.upb.ro>
+Date: Sat, 9 Nov 2019 01:12:33 +0200
+Subject: [PATCH 1/1] Added operator != for pte_handle_t
+
+Signed-off-by: Vlad-Andrei Badoiu <vlad_andrei.badoiu@stud.acs.upb.ro>
+---
+ pthread.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/pthread.h b/pthread.h
+index 48625a4..da0c722 100644
+--- a/pthread.h
++++ b/pthread.h
+@@ -406,6 +406,7 @@ enum
+         }
+         inline struct pte_handle& operator=(unsigned int ptr_value);
+         inline bool operator==(int ptr_value);
++	 inline bool operator!=(int ptr_value);
+ #endif
+       } pte_handle_t;
+ 
+@@ -1010,12 +1011,23 @@ enum
+         return ((size_t) l.p) == ((size_t) r.p);
+     }
+ 
++    /* Operator to be compatible to libstd++ */
++    inline bool operator!=(pte_handle_t const& l, pte_handle_t const& r)
++    {
++        return ((size_t) l.p) != ((size_t) r.p);
++    }
++
+     /* Operator to compare the thread pointer with a given value */
+     bool pte_handle_t::operator==(int ptr_value)
+     {
+         return ((size_t) this->p) == ((size_t) (reinterpret_cast <void *>(ptr_value)));
+     }
+ 
++    bool pte_handle_t::operator!=(int ptr_value)
++    {
++        return ((size_t) this->p) != ((size_t) (reinterpret_cast <void *>(ptr_value)));
++    }
++
+     /* Operator to assign a given value to the thread pointer */
+     pte_handle_t& pte_handle_t::operator=(unsigned int ptr_value)
+     {
+-- 
+2.20.1
+
