@@ -69,6 +69,14 @@ There are several options that you can add by changing Makefile or loader.c:
 
 The project is a proof-of-concept and at a very early development stage. It does not pretend to be ready-to-use. It likely has various flaws, requires significant improvement, and refactoring.
 
+## Paper
+
+You can find detailes about the project, motivation, design and etc here:
+
+```
+Vasily A. Sartakov, Lluis Vilanova, Peter Pietzuch: CubicleOS: A Library OS with Software Componentisation for Practical Isolation, accepted to The 26th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS'21), ACM, 2021
+```
+
 ## What does LLVM macro stand for?
 
 Early prototypes use semi-automatic window management. Now all windows 'manual' and this macro just shows the orgiginal form of variables.
