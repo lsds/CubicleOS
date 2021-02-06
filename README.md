@@ -10,6 +10,12 @@ Together, these abstractions provide spatial memory isolation, temporal memory i
 CubicleOS is implemented on top of Unikraft, a featurerich library OS that can execute existing POSIX-compatible applications,
 and runs on top of an existing host OS such as Linux.
 
+You can find detailes about the project, motivation, design and etc here:
+
+```
+Vasily A. Sartakov, Lluis Vilanova, Peter Pietzuch: CubicleOS: A Library OS with Software Componentisation for Practical Isolation, accepted to The 26th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS'21), ACM, 2021
+```
+
 ## How to build and run
 
 You may want to install some of these packages:
@@ -68,14 +74,6 @@ There are several options that you can add by changing Makefile or loader.c:
 ## Disclaimer
 
 The project is a proof-of-concept and at a very early development stage. It does not pretend to be ready-to-use. It likely has various flaws, requires significant improvement, and refactoring.
-
-## Paper
-
-You can find detailes about the project, motivation, design and etc here:
-
-```
-Vasily A. Sartakov, Lluis Vilanova, Peter Pietzuch: CubicleOS: A Library OS with Software Componentisation for Practical Isolation, accepted to The 26th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS'21), ACM, 2021
-```
 
 ## What does LLVM macro stand for?
 
