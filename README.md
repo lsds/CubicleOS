@@ -11,6 +11,14 @@ CubicleOS is implemented on top of Unikraft, a featurerich library OS that can e
 and runs on top of an existing host OS such as Linux.
 
 ## How to build and run
+
+You may want to install some of these packages:
+```
+apt install -y build-essential libncurses-dev python3 expect-dev  moreutils flex unzip bison wget libxml2-utils tclsh \
+	python python-tempita python-six python-future python-ply xorriso qemu-system-x86 curl gawk
+```
+Check out:
+
 ```
 git clone https://github.com/lsds/cubicleos
 ```
