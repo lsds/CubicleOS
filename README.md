@@ -10,6 +10,30 @@ Together, these abstractions provide spatial memory isolation, temporal memory i
 CubicleOS is implemented on top of Unikraft, a featurerich library OS that can execute existing POSIX-compatible applications,
 and runs on top of an existing host OS such as Linux.
 
+## How to build and run
+```
+git clone https://github.com/lsds/cubicleos
+```
+### Check MPK
+```
+cd check_mpk
+gcc ./check.c
+./a.out
+```
+
+Expected output:
+```
+pkey alloc = 1
+pkey: Success
+```
+
+### Building and running 
+```
+cd cubicleos/sqlite
+make
+cd ../kernel/
+LD_LIBRARY_PATH=./sqlite unbuffer ./loader sqlite --size 100 -mmap 0 --stats testing | ts -s '%M:%.S'
+```
 
 ## Some configuration opetions
 
@@ -24,12 +48,12 @@ There are several options that you can add by changing Makefile or loader.c:
 
 ## Some CubicleOS internals
 
-* [getcontext.S](CubicleOS/kernel/getcontext.S) [setcontext.S](CubicleOS/kernel/setcontext.S) [coro.h](CubicleOS/kernel/coro.h) [ucontext_i.h](CubicleOS/kernel/ucontext_i.h): Implements low-level switching mechanic. Each cross-cubicle call -- coroutine-like switch
-* [elf_hook.h](CubicleOS/kernel/elf_hook.h) [elf_hook.c](CubicleOS/kernel/elf_hook.c) [plthook_elf.c](CubicleOS/kernel/plthook_elf.c)  [plthook.h](CubicleOS/kernel/): used to patch GPT and properly parse ELF symbols. Only one will be used in the future.
-* [mini-printf.c](CubicleOS/kernel/mini-printf.c) [mini-printf.h](CubicleOS/kernel/mini-printf.h): printf inside a trap, needed for debuging at some stage of the development
-* [Makefile](CubicleOS/kernel/Makefile): Compiles dependencies, re-link binaries as separate .so libraries.
-* [fig.py](CubicleOS/kernel/fig.py): parses [unikraft/unikraft.ll](CubicleOS/unikraft/unikraft.ll) and generates cross-cubicle calls for each public function. Generates gen_hooks.h.
-* [loader.c](CubicleOS/kernel/loader.c) [headers.h](CubicleOS/kernel/headers.h): The Monitor. Loads libraries into memory, patches GPT, intercepts cross-cubicle calls, switches pages between cubicles.
+* [getcontext.S](kernel/getcontext.S) [setcontext.S](kernel/setcontext.S) [coro.h](kernel/coro.h) [ucontext_i.h](kernel/ucontext_i.h): Implements low-level switching mechanic. Each cross-cubicle call -- coroutine-like switch
+* [elf_hook.h](kernel/elf_hook.h) [elf_hook.c](kernel/elf_hook.c) [plthook_elf.c](kernel/plthook_elf.c)  [plthook.h](kernel/): used to patch GPT and properly parse ELF symbols. Only one will be used in the future.
+* [mini-printf.c](kernel/mini-printf.c) [mini-printf.h](kernel/mini-printf.h): printf inside a trap, needed for debuging at some stage of the development
+* [Makefile](kernel/Makefile): Compiles dependencies, re-link binaries as separate .so libraries.
+* [fig.py](kernel/fig.py): parses [unikraft/unikraft.ll](unikraft/unikraft.ll) and generates cross-cubicle calls for each public function. Generates gen_hooks.h.
+* [loader.c](kernel/loader.c) [headers.h](kernel/headers.h): The Monitor. Loads libraries into memory, patches GPT, intercepts cross-cubicle calls, switches pages between cubicles.
   
 ## Disclaimer
 
