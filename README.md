@@ -35,6 +35,8 @@ cd ../kernel/
 LD_LIBRARY_PATH=./sqlite unbuffer ./loader sqlite --size 100 -mmap 0 --stats testing | ts -s '%M:%.S'
 ```
 
+you can use `sqlite3` and `sqlite4`, they deploy different number of cubicles.
+
 ## Some configuration opetions
 
 There are several options that you can add by changing Makefile or loader.c:
