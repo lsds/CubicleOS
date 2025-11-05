@@ -51,7 +51,7 @@ LD_LIBRARY_PATH=./sqlite unbuffer ./loader sqlite --size 100 -mmap 0 --stats tes
 
 you can use `sqlite3` and `sqlite4`, they deploy different number of cubicles.
 
-## Some configuration opetions
+## Some configuration options
 
 There are several options that you can add by changing Makefile or loader.c:
 * NOMPK: Loader implements cross-cubicle calls, but cubicles are not protected. Works on any suitable hardware and does not require porting.
@@ -77,7 +77,7 @@ The project is a proof-of-concept and at a very early development stage. It does
 
 ## What does LLVM macro stand for?
 
-Early prototypes use semi-automatic window management. Now all windows 'manual' and this macro just shows the orgiginal form of variables.
+Early prototypes use semi-automatic window management. Now all windows 'manual' and this macro just shows the original form of variables.
 
 ## Known bugs and errors
 
@@ -92,5 +92,5 @@ You need to stop the test, kill all relevant processes, and start again.
 
 ### Does not start 
 
-Different OSes and Kernels somethimes have a slightly different structure of /proc/self/mem, which we parse at start.
+Different OSes and Kernels sometimes have a slightly different structure of /proc/self/mem, which we parse at start.
 We tested CubicleOSs with Debian 10 and Linux kernel 4.4.0. 
